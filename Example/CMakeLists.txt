@@ -10,3 +10,9 @@ include_directories("d:/development/LLUtils/Include")
 add_executable (Example "Example.cpp")
 
 TARGET_LINK_LIBRARIES(Example hid )
+
+if(MSVC)
+  target_compile_options(Example PRIVATE /W4 /WX)
+else()
+  target_compile_options(Example PRIVATE -Wall -Wextra -pedantic -Werror)
+endif()
