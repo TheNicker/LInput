@@ -38,11 +38,10 @@ SOFTWARE.
 
 #include <type_traits>
 
-#ifndef LINPUT_DISABLE_HID
-	#include <hidclass.h>
-	#include <hidusage.h>
-	#include <hidpi.h>
-#endif
+#include <hidclass.h>
+#include <hidusage.h>
+#include <hidpi.h>
+
 
 
 
