@@ -1,4 +1,29 @@
+/*
+Copyright (c) 2020 Lior Lahav
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+
+
 #pragma once
+
 
 #include <windows.h>
 #include <LLUtils/Buffer.h>
@@ -38,41 +63,15 @@ namespace LInput::Win32
                 GetModuleHandle(nullptr),  // Instance handle
                 this        // Additional application data
             );
-
         }
+
         HWND GetHandle() const
         {
             return fHandle;
         }
     private:
         HWND fHandle = nullptr;
-        //ShowWindow(hwnd, SW_SHOW);
+        
     };
-
-      /*  static LRESULT WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-        {
-            if (msg == WM_CREATE)
-            {
-                CREATESTRUCT* s = (CREATESTRUCT*)lparam;
-                if (SetProp(hwnd, L"windowClass", s->lpCreateParams) == 0)
-                    std::exception("Unable to set window property");
-                reinterpret_cast<Window*>(s->lpCreateParams)->handle = hwnd;
-
-            }
-
-
-            Window* target = reinterpret_cast<Window*>(GetProp(hwnd, (L"windowClass")));
-            if (target != nullptr)
-
-                return target->WndProc(hwnd, msg, wparam, lparam);
-            else return DefWindowProc(hwnd, msg, wparam, lparam);
-
-        }
-       
-        LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-        {
-            return DefWindowProc(hwnd, msg, wparam, lparam);
-        }*/
-
 }
 

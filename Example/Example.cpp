@@ -1,3 +1,24 @@
+/*
+Copyright (c) 2020 Lior Lahav
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
 
 #define UNICODE
 #define _UNICODE
@@ -17,11 +38,12 @@
 #include <LInput/Mouse/MouseCodeHelper.h>
 
 
+//button support for multiple keyboards
+using KeyboardGroup = std::map<uint8_t, LInput::ButtonsState<uint16_t, 58000>>;
 
-LInput::ButtonsState<uint16_t, 58000> keyboardState;
+KeyboardGroup keyboardState;
 LInput::ButtonsState<uint8_t,8> mouseState;
 LInput::ButtonsState<uint8_t,32> hidState;
-//KeyDoubleTap doubleTap;
 
 void OnKeyBoardEvent(const LInput::ButtonStdExtension<uint16_t>::ButtonEvent& btnEvent)
 {
@@ -33,7 +55,7 @@ void OnKeyBoardEvent(const LInput::ButtonStdExtension<uint16_t>::ButtonEvent& bt
 
 	std::string nameofEvent = btnEvent.eventType == ButtonStdExtension<uint16_t>::EventType::Pressed ? " Pressed" : " Released";
 
-	std::string msg = std::to_string(c) + ": " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
+	std::string msg = std::to_string(c) + " Device ID:" + std::to_string(btnEvent.parent->GetID()) + " " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
 
 	std::cout << msg.c_str();
 	//OutputDebugStringA(msg.c_str());
@@ -76,14 +98,6 @@ void OnHIDEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEvent
 }
 
 
-
-void TestKeys()
-{
-	using namespace LInput;
-	
-
-}
-
 static void MessageLoop()
 {
 	MSG msg;
@@ -108,8 +122,27 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 	using namespace LInput;
 	if (evnt.deviceType == RawInput::RawInputDeviceType::Keyboard)
 	{
+
+		std::cout << "[Device ID: " + std::to_string(evnt.deviceIndex) + "] ";
 		const auto& keyEvent = static_cast<const RawInput::RawInputEventKeyBoard&>(evnt);
-		keyboardState.SetButtonState(static_cast<decltype(keyboardState)::ButtonType>(keyEvent.scanCode), keyEvent.state);
+		
+		// Add button states for multiple keyboards. 
+
+		auto it = keyboardState.find(evnt.deviceIndex);
+		//if keyboard ID not found add new buttonstates entry.
+		if (it == std::end(keyboardState))
+		{
+			it = keyboardState.emplace(evnt.deviceIndex, decltype(keyboardState)::mapped_type()).first;
+			
+			std::shared_ptr<ButtonStdExtension<uint16_t>> stdExtension = std::make_shared<ButtonStdExtension<uint16_t>>(evnt.deviceIndex);
+			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint16_t>>(stdExtension));
+			stdExtension->OnButtonEvent.Add(std::bind(&OnKeyBoardEvent, std::placeholders::_1));
+		}
+		
+		it->second.SetButtonState(static_cast<decltype(keyboardState)::mapped_type::ButtonType>(keyEvent.scanCode), keyEvent.state);
+
+		
+
 	}
 	else if (evnt.deviceType == RawInput::RawInputDeviceType::Mouse)
 	{
@@ -139,8 +172,6 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 	
 		//
 		//std::cout << std::endl << "X: " << (int)hidEvent.buttonState[0];
-
-	
 	}
 }
 
@@ -154,26 +185,23 @@ int main()
 	RawInput rawInput(window.GetHandle());
 
 	// Add devices
-	rawInput.AddDevice(RawInput::UsagePage::GenericDesktopControls, RawInput::GenericDesktopControlsUsagePage::Mouse,    RawInput::Flags::EnableBackground);
+	rawInput.AddDevice(RawInput::UsagePage::GenericDesktopControls, RawInput::GenericDesktopControlsUsagePage::Mouse, RawInput::Flags::EnableBackground);
 	rawInput.AddDevice(RawInput::UsagePage::GenericDesktopControls, RawInput::GenericDesktopControlsUsagePage::Keyboard, RawInput::Flags::EnableBackground);
 	rawInput.AddDevice(RawInput::UsagePage::GenericDesktopControls, RawInput::GenericDesktopControlsUsagePage::Joystick, RawInput::Flags::EnableBackground);
+
 	
 	//Add input callback 
 
 	rawInput.OnInput.Add(std::bind(&OnRawInput, std::placeholders::_1));
-
 	rawInput.Enable(true);
 	//Add button management
 
-	std::shared_ptr<ButtonStdExtension<uint16_t>> stdExtension = std::make_shared<ButtonStdExtension<uint16_t>>();
-	keyboardState.AddExtension(std::static_pointer_cast<IButtonable<uint16_t>>(stdExtension));
-	stdExtension->OnButtonEvent.Add(std::bind(&OnKeyBoardEvent, std::placeholders::_1));
 
-	std::shared_ptr<ButtonStdExtension<uint8_t>> stdExtensionMouse = std::make_shared<ButtonStdExtension<uint8_t>>();
+	std::shared_ptr<ButtonStdExtension<uint8_t>> stdExtensionMouse = std::make_shared<ButtonStdExtension<uint8_t>>(0);
 	mouseState.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtensionMouse));
 	stdExtensionMouse->OnButtonEvent.Add(std::bind(&OnMouseEvent, std::placeholders::_1));
 
-	std::shared_ptr<ButtonStdExtension<uint8_t>> stdExtensionHID = std::make_shared<ButtonStdExtension<uint8_t>>();
+	std::shared_ptr<ButtonStdExtension<uint8_t>> stdExtensionHID = std::make_shared<ButtonStdExtension<uint8_t>>(0);
 	hidState.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtensionHID));
 	stdExtensionHID->OnButtonEvent.Add(std::bind(&OnHIDEvent, std::placeholders::_1));
 

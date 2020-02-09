@@ -25,17 +25,24 @@ SOFTWARE.
 #include <vector>
 #include <array>
 #include <climits>
+#include <map>
 
 #include <Windows.h>
 #include <LLUtils/Exception.h>
+#include <LLUtils/EnumClassBitwise.h>
+#include <LLUtils/UniqueIDProvider.h>
 #include <LInput/Buttons/ButtonType.h>
 #include <LInput/Keys/KeyCodeHelper.h>
 #include <LInput/Mouse/MouseCode.h>
 
 
-#include <hidclass.h>
-#include <hidusage.h>
-#include <hidpi.h>
+#include <type_traits>
+
+#ifndef LINPUT_DISABLE_HID
+	#include <hidclass.h>
+	#include <hidusage.h>
+	#include <hidpi.h>
+#endif
 
 
 
@@ -93,6 +100,10 @@ namespace LInput
             , PageOnly = 0x00000020 // RIDEV_PAGEONLY  If set, this specifies all devices whose top level collection is from the specified usUsagePage.Note that usUsage must be zero.To exclude a particular top level collection, use RIDEV_EXCLUDE.
             , RemoveDevice = 0x00000001 // RIDEV_REMOVE If set, this removes the top level collection from the inclusion list.This tells the operating system to stop reading from a device which matches the top level collection.
         };
+		
+		//Add support Enum class support for bitflags
+		LLUTILS_DEFINE_ENUM_CLASS_FLAG_OPERATIONS_IN_CLASS(Flags);
+
 
         struct RawInputDevice
         {
@@ -150,31 +161,62 @@ namespace LInput
 
         OnInputType OnInput;
 
-        RawInput(HWND hwnd)
+        RawInput(HWND hwnd)  : fIds(1)
         {
-            fWindowHandle = hwnd;
-            if (SetProp(hwnd, sCurrentInstanceName, (HANDLE)this) == 0)
-                LL_EXCEPTION_SYSTEM_ERROR("could not set window property");
-
-            
+            AttachWindow(hwnd);
         }
 
-        ~RawInput()
+        template <bool allowThrow = true>
+        void DetachCurrentWindow()
         {
-            Enable(false);
-            if (RemoveProp(fWindowHandle, sCurrentInstanceName) == nullptr)
+            if (fWindowHandle != nullptr)
             {
-                // Error.
+                Enable(false);
+                if (RemoveProp(fWindowHandle, sCurrentInstanceName) == nullptr)
+                {
+                    if (allowThrow)
+                        LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Cannot remove property from window");
+                }
+                fWindowHandle = nullptr;
+                for (const auto& p : fDevicehHandleToID)
+                    fIds.Release(p.second);
+
+                fIds.Normalize();
+
+                if (allowThrow)
+                if (fIds.GetNextID() != fIds.GetStartID())
+                    LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Missing ID's that should have been released");
+
+
+                fDevicehHandleToID.clear();
+                fDeviceNameToID.clear();
+                fWindowHandle = nullptr;
             }
         }
 
 
-        void HandleRawInputKeyboard(RAWKEYBOARD& rawKeyboard)
+        void AttachWindow(HWND hwnd)
+        {
+            DetachCurrentWindow<true>();
+            fWindowHandle = hwnd;
+            
+            if (SetProp(hwnd, sCurrentInstanceName, (HANDLE)this) == 0)
+                LL_EXCEPTION_SYSTEM_ERROR("could not set window property");
+            Enable(true);
+        }
+
+        ~RawInput()
+        {
+            DetachCurrentWindow<false>();
+        }
+
+
+        void HandleRawInputKeyboard(RAWINPUTHEADER& header, RAWKEYBOARD& rawKeyboard)
         {
             RawInputEventKeyBoard keyEvent{};
             auto evnt = KeyCodeHelper::KeyEventFromRawInput(rawKeyboard);
             keyEvent.state = evnt.state;
-            keyEvent.deviceIndex = 0;
+			keyEvent.deviceIndex = GetDeviceID(static_cast<HRAWINPUT> (header.hDevice));
             keyEvent.deviceType = RawInputDeviceType::Keyboard;
             keyEvent.scanCode = evnt.keyCode;
             OnInput.Raise(keyEvent);
@@ -187,7 +229,7 @@ namespace LInput
 
             rid.usUsagePage = static_cast<USHORT>(page);
             rid.usUsage = static_cast<USHORT>(usage);
-            rid.dwFlags = static_cast<DWORD>(flags);
+            rid.dwFlags = static_cast<DWORD>(flags | Flags::EnableDeviceChangeMessage);
             rid.hwndTarget = fWindowHandle;
 
 
@@ -202,7 +244,7 @@ namespace LInput
 
             RawInputEventHID evnt{ };
             evnt.deviceType = RawInputDeviceType::GamePad;
-            evnt.deviceIndex = 1;
+            evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice));
             std::fill(std::begin(evnt.buttonState), std::end(evnt.buttonState), State::Up);
 
             USHORT               capsLength;
@@ -287,24 +329,24 @@ namespace LInput
                 {
                     //case RIV_BUTTON
                 case HID_USAGE_GENERIC_X:	// X-axis
-                    evnt.axes[static_cast<uint8_t>(Axes::X)] = (LONG)value - 128;;
+                    evnt.axes[static_cast<uint8_t>(Axes::X)] = static_cast<int8_t>(static_cast<std::make_signed_t<decltype(value)>>(value) - 128);
                     break;
 
                 case HID_USAGE_GENERIC_Y:	// Y-axis
-                    evnt.axes[static_cast<uint8_t>(Axes::Y)] = (LONG)value - 128;;
+                    evnt.axes[static_cast<uint8_t>(Axes::Y)] = static_cast<int8_t>(static_cast<std::make_signed_t<decltype(value)>>(value) - 128);
                     break;
 
                 case HID_USAGE_GENERIC_Z: // Z-axis
-                    evnt.axes[static_cast<uint8_t>(Axes::Z)] = (LONG)value - 128;;
+                    evnt.axes[static_cast<uint8_t>(Axes::Z)] = static_cast<int8_t>(static_cast<std::make_signed_t<decltype(value)>>(value) - 128);
                     break;
                 
 
                 case HID_USAGE_GENERIC_RZ: // Rotate-Z
-                    evnt.axes[static_cast<uint8_t>(Axes::ZRotate)] = (LONG)value - 128;;
+                    evnt.axes[static_cast<uint8_t>(Axes::ZRotate)] = static_cast<int8_t>(static_cast<std::make_signed_t<decltype(value)>>(value) - 128);
                     break;
 
                 case HID_USAGE_GENERIC_HATSWITCH:	
-                    evnt.axes[static_cast<uint8_t>(Axes::HatSwitch)]  = value;
+                    evnt.axes[static_cast<uint8_t>(Axes::HatSwitch)]  = static_cast<int8_t>(value);
                     break;
                 }
             }
@@ -313,12 +355,12 @@ namespace LInput
         }
 
 
-        void HandleRawInputMouse(RAWMOUSE& mouse)
+        void HandleRawInputMouse(RAWINPUTHEADER& header, RAWMOUSE& mouse)
         {
             RawInputEventMouse evnt{};
             evnt.deltaX = mouse.lLastX;
             evnt.deltaY = mouse.lLastY;
-            evnt.deviceIndex = 0;
+			evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice));
             evnt.deviceType = RawInputDeviceType::Mouse;
             if (mouse.ulButtons & RI_MOUSE_WHEEL)
                 evnt.wheelDelta = static_cast<int16_t>(mouse.usButtonData) / WHEEL_DELTA;
@@ -339,15 +381,20 @@ namespace LInput
             OnInput.Raise(evnt);
         }
 
+		uint8_t GetDeviceID(HRAWINPUT handle)
+		{
+			return fDevicehHandleToID.find(handle)->second;
+		}
+
         void ProcessRawInputMessage(RAWINPUT* rawInput)
         {
             switch (rawInput->header.dwType)
             {
             case RIM_TYPEMOUSE:
-                HandleRawInputMouse(rawInput->data.mouse);
+                HandleRawInputMouse(rawInput->header, rawInput->data.mouse);
                 break;
             case RIM_TYPEKEYBOARD:
-                HandleRawInputKeyboard(rawInput->data.keyboard);
+                HandleRawInputKeyboard(rawInput->header, rawInput->data.keyboard);
                 break;
             case RIM_TYPEHID:
                 HandleRawInputHID(rawInput->header, rawInput->data.hid);
@@ -359,64 +406,172 @@ namespace LInput
         }
 
         
-         static  LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+        void ProcessWInMessages([[maybe_unused]] HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
         {
-             RawInput* _this =  reinterpret_cast<RawInput *>( GetProp(hwnd, sCurrentInstanceName));
-            //return DefWindowProc(hwnd, msg, wparam, lparam);
-
-            //using namespace LInput;
             switch (msg)
             {
 
-                case  WM_INPUT:
+            case  WM_INPUT:
+            {
+                UINT dwSize;
+                if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lparam), RID_INPUT, nullptr, &dwSize, sizeof(RAWINPUTHEADER)) != 0)
+                    LL_EXCEPTION_SYSTEM_ERROR("can not get raw input data");
+
+
+                LLUtils::Buffer lpb(dwSize);
+
+
+                if (GetRawInputData((HRAWINPUT)lparam,
+                    RID_INPUT,
+                    lpb.data(),
+                    &dwSize,
+                    sizeof(RAWINPUTHEADER)) != dwSize)
                 {
-                    UINT dwSize;
-                    if (GetRawInputData((HRAWINPUT)lparam, RID_INPUT, nullptr, &dwSize, sizeof(RAWINPUTHEADER)) != 0)
-                        LL_EXCEPTION_SYSTEM_ERROR("can not get raw input data");
-
-
-                    LLUtils::Buffer lpb(dwSize);
-
-                
-                    if (GetRawInputData((HRAWINPUT)lparam,
-                        RID_INPUT,
-                        lpb.data(),
-                        &dwSize,
-                        sizeof(RAWINPUTHEADER)) != dwSize)
-                    {
-                        LL_EXCEPTION_SYSTEM_ERROR("can not get raw input data");
-                    }
-                    _this->ProcessRawInputMessage(reinterpret_cast<RAWINPUT*>(lpb.data()));
-                    break;
+                    LL_EXCEPTION_SYSTEM_ERROR("can not get raw input data");
                 }
 
+                ProcessRawInputMessage(reinterpret_cast<RAWINPUT*>(lpb.data()));
+                break;
             }
 
-            
+            case WM_INPUT_DEVICE_CHANGE:
+            {
+                const HRAWINPUT rawInputHandle = reinterpret_cast<HRAWINPUT>(lparam);
+                if (wparam == GIDC_ARRIVAL)
+                {
+
+                    UINT size = 0;
+                    GetRawInputDeviceInfo(reinterpret_cast<HRAWINPUT>(lparam), RIDI_DEVICENAME, nullptr, &size);
+                    auto buffer = std::make_unique<wchar_t[]>(size);
+                    GetRawInputDeviceInfo(reinterpret_cast<HRAWINPUT>(lparam), RIDI_DEVICENAME, buffer.get(), &size);
+
+                    std::wstring deviceName(buffer.get());
+
+                    auto it = fDeviceNameToID.find(deviceName);
+                    uint8_t id = 0;
+                    if (it == std::end(fDeviceNameToID))
+                    {
+                        id = fIds.Acquire();
+                        fDeviceNameToID.emplace_hint(it, deviceName, id);
+
+
+
+                    }
+                    else
+                    {
+                        id = it->second;
+                    }
+
+
+                    //Remove old handle if exists.
+
+                    for (const auto p : fDevicehHandleToID)
+                    {
+                        if (p.second == id)
+                        {
+                            fDevicehHandleToID.erase(p.first);
+                            break;
+                        }
+                    }
+
+                    //Add new handle
+                    fDevicehHandleToID.emplace(rawInputHandle, id);
+                }
+                else // (wparam == GIDC_REMOVAL)
+                {
+
+                }
+            }
+
+            break;
+
+            }
+        }
+
+        static  LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+        {
+            RawInput* _this = reinterpret_cast<RawInput*>(GetProp(hwnd, sCurrentInstanceName));
+            _this->ProcessWInMessages(hwnd, msg, wparam, lparam);
+
             return _this->fLastWndProc(hwnd, msg, wparam, lparam);
         }
 
+
+#if 0 
+       static LRESULT HookProcedure(int code, WPARAM wParam, LPARAM lParam)
+        {
+
+            if (code < 0)
+                return CallNextHookEx(fHook, code, wParam, lParam);
+
+            CWPRETSTRUCT* sa = reinterpret_cast<PCWPRETSTRUCT>(lParam);
+            CWPRETSTRUCT& s = *sa;
+            
+            if (s.message == WM_SIZE)
+            {
+                int k = 0;
+            }
+            RawInput* _this = reinterpret_cast<RawInput*>(GetProp(s.hwnd, sCurrentInstanceName));
+            if ( _this != nullptr)
+                _this->ProcessWInMessages(s.hwnd, s.message, s.wParam ,s.lParam);
+
+             return CallNextHookEx(fHook, code,wParam, lParam);
+       }
+#endif
+
+
+        
+
+        
+
         void Enable(bool enable)
         {
-            if (enable == true && fLastWndProc == nullptr)
+#if 0 
+            if (fWindowHandle != nullptr) 
             {
-                fLastWndProc = (WNDPROC)SetWindowLongPtr(fWindowHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&WndProc));
-
-                if (fLastWndProc == nullptr)
-                    LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not get set custom window procedure");
+                if (enable == true && fHook == nullptr)
+                    fHook =  SetWindowsHookEx(WH_GETMESSAGE, reinterpret_cast<HOOKPROC>(&HookProcedure), nullptr, GetCurrentThreadId());
+                else if (enable == false && fHook != nullptr)
+                {
+                    UnhookWindowsHookEx(fHook);
+                    fHook = nullptr;
+                }
             }
-            else if (enable == false && fLastWndProc != nullptr)
+#else 
+            //Change WindowProc directly.
+            
+            if (fWindowHandle != nullptr) // Enable or disable only if window is attached
             {
-                 if (SetWindowLongPtr(fWindowHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(fLastWndProc)) != reinterpret_cast<LONG_PTR>(&WndProc))
-                     LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not restore original window procedure");
+                if (enable == true && fLastWndProc == nullptr)
+                {
+                    fLastWndProc = (WNDPROC)SetWindowLongPtr(fWindowHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&WndProc));
 
-                 fLastWndProc = nullptr;
+                    if (fLastWndProc == nullptr)
+                        LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not get set custom window procedure");
+                }
+                else if (enable == false && fLastWndProc != nullptr)
+                {
+                    if (SetWindowLongPtr(fWindowHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(fLastWndProc)) != reinterpret_cast<LONG_PTR>(&WndProc))
+                        LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not restore original window procedure");
+
+                    fLastWndProc = nullptr;
+                }
             }
+#endif
         }
 
     private:
         static constexpr wchar_t sCurrentInstanceName[] = L"__LINPUT_CURRENT_INSTANCE__";
+		using MapDeviceHandleToID = std::map<HRAWINPUT, uint8_t> ;
+		using MapDeviceNameToID = std::map<std::wstring, uint8_t>;
+		
+        MapDeviceHandleToID fDevicehHandleToID;
+		MapDeviceNameToID fDeviceNameToID;
+		LLUtils::UniqueIdProvider<uint8_t> fIds;
         HWND fWindowHandle = nullptr;
+#if 0
+        static inline HHOOK fHook = nullptr;
+#endif
         WNDPROC fLastWndProc = nullptr;
 ;   };
     

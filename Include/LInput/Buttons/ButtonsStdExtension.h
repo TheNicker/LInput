@@ -42,11 +42,15 @@ namespace LInput
 		using ButtonType = T;
 		enum class EventType { NotSet, Pressed, Released };
 
+		ButtonStdExtension(uint16_t id) : fID(id) {}
+
+
 
 		///////////////////////
 		// Button event            
 		struct ButtonEvent
 		{
+			ButtonStdExtension* parent;
 			uint64_t timeStamp;
 			ButtonType button;
 			EventType eventType;
@@ -81,7 +85,7 @@ namespace LInput
 
 
 	public:
-
+		uint16_t GetID() const { return fID; }
 		// Get the state of a button whether it's down or up
 		void SetButtonState(ButtonType button, State oldstate, State newState) override
 		{
@@ -102,13 +106,13 @@ namespace LInput
 						else
 							buttonData.pressCounter = 0;
 
-						OnButtonEvent.Raise(ButtonEvent{ 0,button,EventType::Pressed,buttonData.pressCounter });
+						OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Pressed,buttonData.pressCounter });
 
 					}
 				}
 				if (newState == State::Up)
 				{
-					OnButtonEvent.Raise(ButtonEvent{ 0,button,EventType::Released,buttonData.pressCounter });
+					OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Released,buttonData.pressCounter });
 
 					if (multiPressTHreshold == false)
 						buttonData.pressCounter = 0;
@@ -125,5 +129,6 @@ namespace LInput
 		using MapButtonToData = std::map<uint16_t, ButtonData>;
 		MapButtonToData mMapButttons;
 		uint16_t fDoublePressThreshold = 250;
+		uint16_t fID = 0;
 	};
 }
