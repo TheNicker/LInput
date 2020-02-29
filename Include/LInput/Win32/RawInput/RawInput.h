@@ -31,6 +31,7 @@ SOFTWARE.
 #include <LLUtils/Exception.h>
 #include <LLUtils/EnumClassBitwise.h>
 #include <LLUtils/UniqueIDProvider.h>
+#include <LLUtils/Buffer.h>
 #include <LInput/Buttons/ButtonType.h>
 #include <LInput/Keys/KeyCodeHelper.h>
 #include <LInput/Mouse/MouseCode.h>
@@ -118,6 +119,14 @@ namespace LInput
             , GamePad
 
         };
+
+        struct DeviceInfo
+        {
+            uint8_t deviceID;
+            RawInputDeviceType deviceType;
+
+        };
+
         struct RawInputEvent
         {
             RawInputDeviceType deviceType;
@@ -188,7 +197,7 @@ namespace LInput
 
 
                 fDevicehHandleToID.clear();
-                fDeviceNameToID.clear();
+                fDeviceNameToInfo.clear();
                 fWindowHandle = nullptr;
             }
         }
@@ -387,24 +396,28 @@ namespace LInput
 
         void ProcessRawInputMessage(RAWINPUT* rawInput)
         {
-            switch (rawInput->header.dwType)
-            {
-            case RIM_TYPEMOUSE:
-                HandleRawInputMouse(rawInput->header, rawInput->data.mouse);
-                break;
-            case RIM_TYPEKEYBOARD:
-                HandleRawInputKeyboard(rawInput->header, rawInput->data.keyboard);
-                break;
-            case RIM_TYPEHID:
-                HandleRawInputHID(rawInput->header, rawInput->data.hid);
-                break;
-            default:
-                LL_EXCEPTION_UNEXPECTED_VALUE;
 
+            if (rawInput->header.hDevice != nullptr) // Fix trackpad issues in laptops
+            {
+                switch (rawInput->header.dwType)
+                {
+                case RIM_TYPEMOUSE:
+                    HandleRawInputMouse(rawInput->header, rawInput->data.mouse);
+                    break;
+                case RIM_TYPEKEYBOARD:
+                    HandleRawInputKeyboard(rawInput->header, rawInput->data.keyboard);
+                    break;
+                case RIM_TYPEHID:
+                    HandleRawInputHID(rawInput->header, rawInput->data.hid);
+                    break;
+                default:
+                    LL_EXCEPTION_UNEXPECTED_VALUE;
+
+                }
             }
         }
 
-        
+
         void ProcessWInMessages([[maybe_unused]] HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
         {
             switch (msg)
@@ -443,22 +456,23 @@ namespace LInput
                     GetRawInputDeviceInfo(reinterpret_cast<HRAWINPUT>(lparam), RIDI_DEVICENAME, nullptr, &size);
                     auto buffer = std::make_unique<wchar_t[]>(size);
                     GetRawInputDeviceInfo(reinterpret_cast<HRAWINPUT>(lparam), RIDI_DEVICENAME, buffer.get(), &size);
-
                     std::wstring deviceName(buffer.get());
 
-                    auto it = fDeviceNameToID.find(deviceName);
+                    RID_DEVICE_INFO info;
+                    info.cbSize = sizeof(info);
+                    size = sizeof(info);
+                    GetRawInputDeviceInfo(reinterpret_cast<HRAWINPUT>(lparam), RIDI_DEVICEINFO, &info, &size);
+
+                    auto it = fDeviceNameToInfo.find(deviceName);
                     uint8_t id = 0;
-                    if (it == std::end(fDeviceNameToID))
+                    if (it == std::end(fDeviceNameToInfo))
                     {
                         id = fIds.Acquire();
-                        fDeviceNameToID.emplace_hint(it, deviceName, id);
-
-
-
+                        fDeviceNameToInfo.emplace_hint(it, deviceName, DeviceInfo{ id , static_cast<RawInputDeviceType>(info.dwType)});
                     }
                     else
                     {
-                        id = it->second;
+                        id = it->second.deviceID;
                     }
 
 
@@ -562,10 +576,10 @@ namespace LInput
     private:
         static constexpr wchar_t sCurrentInstanceName[] = L"__LINPUT_CURRENT_INSTANCE__";
 		using MapDeviceHandleToID = std::map<HRAWINPUT, uint8_t> ;
-		using MapDeviceNameToID = std::map<std::wstring, uint8_t>;
+		using MapDeviceNameToInfo = std::map<std::wstring, DeviceInfo>;
 		
         MapDeviceHandleToID fDevicehHandleToID;
-		MapDeviceNameToID fDeviceNameToID;
+        MapDeviceNameToInfo fDeviceNameToInfo;
 		LLUtils::UniqueIdProvider<uint8_t> fIds;
         HWND fWindowHandle = nullptr;
 #if 0

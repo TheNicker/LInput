@@ -91,8 +91,8 @@ namespace LInput
 		{
 
 			ButtonData& buttonData = GetButtonData(button);
-			uint64_t elpased = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
-			bool multiPressTHreshold = (elpased - buttonData.timeStamp) < fDoublePressThreshold;
+			uint64_t currentTimeStamp = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
+			bool multiPressTHreshold = buttonData.timeStamp != 0 && (currentTimeStamp - buttonData.timeStamp) < fDoublePressThreshold;
 
 			if (buttonData.buttonState != newState)
 			{
@@ -119,7 +119,7 @@ namespace LInput
 
 				}
 
-				buttonData.timeStamp = elpased;
+				buttonData.timeStamp = currentTimeStamp;
 				buttonData.buttonState = newState;
 			}
 

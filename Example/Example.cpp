@@ -39,11 +39,22 @@ SOFTWARE.
 
 
 //button support for multiple keyboards
-using KeyboardGroup = std::map<uint8_t, LInput::ButtonsState<uint16_t, 58000>>;
+
+template <typename T>
+using DeviceGroup = std::map < uint8_t, T>;
+
+using KeyboardButtonstate = LInput::ButtonsState<uint16_t, 58000>;
+using KeyboardGroup = DeviceGroup<KeyboardButtonstate>;
+using MouseButtonstate = LInput::ButtonsState<uint8_t, 8>;
+using MouseGroup = DeviceGroup<MouseButtonstate>;
+using HIDButtonState = LInput::ButtonsState<uint8_t, 32>;
+using HIDGroup = DeviceGroup<HIDButtonState>;
+
+
 
 KeyboardGroup keyboardState;
-LInput::ButtonsState<uint8_t,8> mouseState;
-LInput::ButtonsState<uint8_t,32> hidState;
+MouseGroup mouseState;
+HIDGroup hidState;
 
 void OnKeyBoardEvent(const LInput::ButtonStdExtension<uint16_t>::ButtonEvent& btnEvent)
 {
@@ -52,10 +63,8 @@ void OnKeyBoardEvent(const LInput::ButtonStdExtension<uint16_t>::ButtonEvent& bt
 	c++;
 
 	std::string buttonName = KeyCodeHelper::KeyCodeToString(static_cast<KeyCode>(btnEvent.button));
-
 	std::string nameofEvent = btnEvent.eventType == ButtonStdExtension<uint16_t>::EventType::Pressed ? " Pressed" : " Released";
-
-	std::string msg = std::to_string(c) + " Device ID:" + std::to_string(btnEvent.parent->GetID()) + " " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
+	std::string msg = std::to_string(c) + " [Device ID:" + std::to_string(btnEvent.parent->GetID()) + "] " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
 
 	std::cout << msg.c_str();
 	//OutputDebugStringA(msg.c_str());
@@ -70,10 +79,8 @@ void OnMouseEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEve
 	c++;
 
 	std::string buttonName =  MouseCodeHelper::MouseCodeToString(static_cast<MouseButton>(btnEvent.button));
-
 	std::string nameofEvent = btnEvent.eventType == ButtonStdExtension<uint8_t>::EventType::Pressed ? " Pressed" : " Released";
-
-	std::string msg = std::to_string(c) + ": " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
+	std::string msg = std::to_string(c) + " [Device ID:" + std::to_string(btnEvent.parent->GetID()) + "] " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
 
 	
 
@@ -92,7 +99,7 @@ void OnHIDEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEvent
 
 	std::string nameofEvent = btnEvent.eventType == ButtonStdExtension<uint8_t>::EventType::Pressed ? " Pressed" : " Released";
 
-	std::string msg = std::to_string(c) + ": " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
+	std::string msg = std::to_string(c) + " [Device ID:" + std::to_string(btnEvent.parent->GetID()) + "] " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
 
 	std::cout << msg.c_str();
 }
@@ -122,12 +129,9 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 	using namespace LInput;
 	if (evnt.deviceType == RawInput::RawInputDeviceType::Keyboard)
 	{
-
-		std::cout << "[Device ID: " + std::to_string(evnt.deviceIndex) + "] ";
 		const auto& keyEvent = static_cast<const RawInput::RawInputEventKeyBoard&>(evnt);
 		
 		// Add button states for multiple keyboards. 
-
 		auto it = keyboardState.find(evnt.deviceIndex);
 		//if keyboard ID not found add new buttonstates entry.
 		if (it == std::end(keyboardState))
@@ -139,6 +143,7 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 			stdExtension->OnButtonEvent.Add(std::bind(&OnKeyBoardEvent, std::placeholders::_1));
 		}
 		
+
 		it->second.SetButtonState(static_cast<decltype(keyboardState)::mapped_type::ButtonType>(keyEvent.scanCode), keyEvent.state);
 
 		
@@ -148,8 +153,21 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 	{
 		const auto& mouseEvent = static_cast<const RawInput::RawInputEventMouse&>(evnt);
 
+		// Add button states for multiple mouses. 
+		auto it = mouseState.find(evnt.deviceIndex);
+		//if mouse ID not found add new buttonstates entry.
+		if (it == std::end(mouseState))
+		{
+			it = mouseState.emplace(evnt.deviceIndex, decltype(mouseState)::mapped_type()).first;
+
+			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex);
+			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtension));
+			stdExtension->OnButtonEvent.Add(std::bind(&OnMouseEvent, std::placeholders::_1));
+		}
+
 		for (size_t i = 0; i < RawInput::MaxMouseButtons; i++)
-			mouseState.SetButtonState(static_cast<decltype(mouseState)::ButtonType>(i), mouseEvent.buttonState[i]);
+			
+			it->second.SetButtonState(static_cast<decltype(mouseState)::mapped_type::ButtonType>(i), mouseEvent.buttonState[i]);
 
 		if (mouseEvent.wheelDelta != 0)
 		{
@@ -163,8 +181,22 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 	{
 		const auto& hidEvent = static_cast<const RawInput::RawInputEventHID&>(evnt);
 
+		// Add button states for multiple mouses. 
+		auto it = hidState.find(evnt.deviceIndex);
+		//if mouse ID not found add new buttonstates entry.
+		if (it == std::end(hidState))
+		{
+			it = hidState.emplace(evnt.deviceIndex, decltype(hidState)::mapped_type()).first;
+
+			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex);
+			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtension));
+			stdExtension->OnButtonEvent.Add(std::bind(&OnHIDEvent, std::placeholders::_1));
+		}
+
+
+
 		for (size_t i = 0; i < RawInput::MaxHIDButtons; i++)
-			hidState.SetButtonState(static_cast<decltype(hidState)::ButtonType>(i), hidEvent.buttonState[i]);
+			it->second.SetButtonState(static_cast<decltype(hidState)::mapped_type::ButtonType>(i), hidEvent.buttonState[i]);
 
 	/*	std::cout << std::endl << "X: " << (int)hidEvent.axes[RawInput::Axes::X] << " Y: " << (int)hidEvent.axes[RawInput::Axes::Y]
 			<< " Z: " << (int)hidEvent.axes[RawInput::Axes::Z] << " RZ: " << (int)hidEvent.axes[RawInput::Axes::ZRotate] << " Hat: " << (int)hidEvent.axes[RawInput::Axes::HatSwitch];
@@ -194,16 +226,8 @@ int main()
 
 	rawInput.OnInput.Add(std::bind(&OnRawInput, std::placeholders::_1));
 	rawInput.Enable(true);
-	//Add button management
 
-
-	std::shared_ptr<ButtonStdExtension<uint8_t>> stdExtensionMouse = std::make_shared<ButtonStdExtension<uint8_t>>(0);
-	mouseState.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtensionMouse));
-	stdExtensionMouse->OnButtonEvent.Add(std::bind(&OnMouseEvent, std::placeholders::_1));
-
-	std::shared_ptr<ButtonStdExtension<uint8_t>> stdExtensionHID = std::make_shared<ButtonStdExtension<uint8_t>>(0);
-	hidState.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtensionHID));
-	stdExtensionHID->OnButtonEvent.Add(std::bind(&OnHIDEvent, std::placeholders::_1));
+	std::cout <<  "Press 'Q' three times to quit." << std::endl;
 
 
 	//Handle application events.
