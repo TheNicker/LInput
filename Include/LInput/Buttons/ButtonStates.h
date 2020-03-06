@@ -44,6 +44,11 @@ namespace LInput
 
 	public:
 
+		ButtonsState()
+		{
+			fButtonStates.fill(State::Up);
+		}
+
 		State GetButtonState(ButtonType  buttonId) const override
 		{
 			return fButtonStates[buttonId];
