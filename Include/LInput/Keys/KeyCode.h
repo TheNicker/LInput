@@ -22,6 +22,7 @@ SOFTWARE.
 
 #pragma once
 #include <map>
+#include "../Buttons/ButtonType.h"
 namespace LInput
 {
 //DELETE is a macro defined in winnt.h
