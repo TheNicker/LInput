@@ -586,7 +586,7 @@ namespace LInput
         static inline HHOOK fHook = nullptr;
 #endif
         WNDPROC fLastWndProc = nullptr;
-;   };
+    };
     
 }
 
