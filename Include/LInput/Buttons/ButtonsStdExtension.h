@@ -26,6 +26,7 @@ SOFTWARE.
 #include <cstdint>
 #include <vector>
 #include <map>
+#include <set>
 #include <LLUtils/StopWatch.h>
 #include <LLUtils/Event.h>
 #include <LInput/Buttons/ButtonType.h>

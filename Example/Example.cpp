@@ -215,8 +215,6 @@ int main()
 	using namespace LInput;
 	
 	LInput::Win32::Window window;
-
-	windowHandle = window.GetHandle();
 	
 	RawInput rawInput(window.GetHandle());
 
