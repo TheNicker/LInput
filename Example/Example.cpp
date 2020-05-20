@@ -64,7 +64,8 @@ void OnKeyBoardEvent(const LInput::ButtonStdExtension<uint16_t>::ButtonEvent& bt
 
 	std::string buttonName = KeyCodeHelper::KeyCodeToString(static_cast<KeyCode>(btnEvent.button));
 	std::string nameofEvent = btnEvent.eventType == ButtonStdExtension<uint16_t>::EventType::Pressed ? " Pressed" : " Released";
-	std::string msg = std::to_string(c) + " [Device ID:" + std::to_string(btnEvent.parent->GetID()) + "] " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
+	std::string msg = std::to_string(c) + " [Device ID:" + std::to_string(btnEvent.parent->GetID()) + "] " + buttonName + " " + nameofEvent + " press count: " + std::to_string(btnEvent.counter) + 
+		" repeat count: " + std::to_string(btnEvent.repeatCount) + '\n';
 
 	std::cout << msg.c_str();
 	//OutputDebugStringA(msg.c_str());
@@ -138,7 +139,7 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 		{
 			it = keyboardState.emplace(evnt.deviceIndex, decltype(keyboardState)::mapped_type()).first;
 			
-			std::shared_ptr<ButtonStdExtension<uint16_t>> stdExtension = std::make_shared<ButtonStdExtension<uint16_t>>(evnt.deviceIndex);
+			std::shared_ptr<ButtonStdExtension<uint16_t>> stdExtension = std::make_shared<ButtonStdExtension<uint16_t>>(evnt.deviceIndex,250,10);
 			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint16_t>>(stdExtension));
 			stdExtension->OnButtonEvent.Add(std::bind(&OnKeyBoardEvent, std::placeholders::_1));
 		}
@@ -160,7 +161,7 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 		{
 			it = mouseState.emplace(evnt.deviceIndex, decltype(mouseState)::mapped_type()).first;
 
-			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex);
+			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex,250,10);
 			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtension));
 			stdExtension->OnButtonEvent.Add(std::bind(&OnMouseEvent, std::placeholders::_1));
 		}
@@ -188,7 +189,7 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 		{
 			it = hidState.emplace(evnt.deviceIndex, decltype(hidState)::mapped_type()).first;
 
-			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex);
+			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex,250 ,10);
 			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtension));
 			stdExtension->OnButtonEvent.Add(std::bind(&OnHIDEvent, std::placeholders::_1));
 		}
@@ -213,7 +214,10 @@ int main()
 
 	using namespace LInput;
 	
-	Win32::Window window;
+	LInput::Win32::Window window;
+
+	windowHandle = window.GetHandle();
+	
 	RawInput rawInput(window.GetHandle());
 
 	// Add devices

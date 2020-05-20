@@ -6,5 +6,6 @@ cmake_minimum_required (VERSION 3.8)
 set(CMAKE_CXX_STANDARD 17)
 include_directories("./Include")
 include_directories("D:/development/LLUtils/Include")
-
+include_directories("D:/Development/Win32/Win32/Include")
+add_subdirectory("D:/Development/Win32/Win32" ./ExternalWin32)
 add_subdirectory("Example")

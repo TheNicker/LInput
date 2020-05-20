@@ -30,6 +30,7 @@ SOFTWARE.
 #include <LLUtils/Event.h>
 #include <LInput/Buttons/ButtonType.h>
 #include <LInput/Buttons/IButtonable.h>
+#include <Win32/HighPrecisionTimer.h>
 
 
 namespace LInput
@@ -42,7 +43,14 @@ namespace LInput
 		using ButtonType = T;
 		enum class EventType { NotSet, Pressed, Released };
 
-		ButtonStdExtension(uint16_t id) : fID(id) {}
+		ButtonStdExtension(uint16_t id, uint16_t multipressRate, uint16_t repeatRate) :
+		  fID(id)
+		, fMultiPressRate(multipressRate)
+		, fRepeatRate(repeatRate)
+		{
+			timer.SetDelay(fRepeatRate);
+		}
+		
 
 
 
@@ -55,6 +63,7 @@ namespace LInput
 			ButtonType button;
 			EventType eventType;
 			uint16_t counter;
+			uint16_t repeatCount;
 
 		};
 
@@ -68,6 +77,8 @@ namespace LInput
 			uint64_t timeStamp;
 			State buttonState;
 			uint16_t pressCounter;
+			uint64_t actuationTimeStamp;
+			uint16_t repeatCount;
 		};
 
 
@@ -85,6 +96,30 @@ namespace LInput
 
 
 	public:
+
+
+		void TimerCallback()
+		{
+			if (fPressedButtons.empty() == true)
+				timer.Enable(false);
+				//timer.SetInterval(0);
+			else
+			{
+				for (auto& button : fPressedButtons)
+				{
+					auto& buttonData = GetButtonData(button);
+					auto now = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
+
+					if (now  - buttonData.actuationTimeStamp > fRepeatRate)
+					{
+						buttonData.repeatCount++;
+						OnButtonEvent.Raise(ButtonEvent{ this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount });
+						buttonData.actuationTimeStamp = now;
+					}
+				}
+			}
+		}
+		
 		uint16_t GetID() const { return fID; }
 		// Get the state of a button whether it's down or up
 		void SetButtonState(ButtonType button, State oldstate, State newState) override
@@ -92,7 +127,7 @@ namespace LInput
 
 			ButtonData& buttonData = GetButtonData(button);
 			uint64_t currentTimeStamp = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
-			bool multiPressTHreshold = buttonData.timeStamp != 0 && (currentTimeStamp - buttonData.timeStamp) < fDoublePressThreshold;
+			bool multiPressTHreshold = buttonData.timeStamp != 0 && (currentTimeStamp - buttonData.timeStamp) < fMultiPressRate;
 
 			if (buttonData.buttonState != newState)
 			{
@@ -106,16 +141,31 @@ namespace LInput
 						else
 							buttonData.pressCounter = 0;
 
-						OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Pressed,buttonData.pressCounter });
+						if (fEnableRepeat == true)
+						{
+							fPressedButtons.insert(button);
+							buttonData.actuationTimeStamp = currentTimeStamp;
+							timer.Enable(true);
+						}
+
+						OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount });
 
 					}
 				}
 				if (newState == State::Up)
 				{
-					OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Released,buttonData.pressCounter });
+					OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Released,buttonData.pressCounter, buttonData.repeatCount });
 
-					if (multiPressTHreshold == false)
-						buttonData.pressCounter = 0;
+					
+					if (fEnableRepeat == true)
+					{
+						fPressedButtons.erase(button);
+						buttonData.actuationTimeStamp = 0;
+						buttonData.repeatCount = 0;
+						
+						if (multiPressTHreshold == false)
+							buttonData.pressCounter = 0;
+					}
 
 				}
 
@@ -125,10 +175,16 @@ namespace LInput
 
 		}
 	private:
+		
+		::Win32::HighPrecisionTimer timer = ::Win32::HighPrecisionTimer(std::bind(&ButtonStdExtension::TimerCallback, this));
+		
 		LLUtils::StopWatch fTimer = LLUtils::StopWatch(true);
 		using MapButtonToData = std::map<uint16_t, ButtonData>;
 		MapButtonToData mMapButttons;
-		uint16_t fDoublePressThreshold = 250;
+		std::set<ButtonType> fPressedButtons;
+		uint16_t fMultiPressRate = 250;
+		uint16_t fRepeatRate = 15;
+		bool fEnableRepeat = true;
 		uint16_t fID = 0;
 	};
 }
