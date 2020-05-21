@@ -36,13 +36,15 @@ SOFTWARE.
 
 namespace LInput
 {
+
+	enum class EventType { NotSet, Pressed, Released };
+	
 	template <typename T>
 	class ButtonStdExtension final : public IButtonable<T>
 	{
 	
 	public:
 		using ButtonType = T;
-		enum class EventType { NotSet, Pressed, Released };
 
 		ButtonStdExtension(uint16_t id, uint16_t multipressRate, uint16_t repeatRate) :
 		  fID(id)

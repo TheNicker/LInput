@@ -56,18 +56,26 @@ KeyboardGroup keyboardState;
 MouseGroup mouseState;
 HIDGroup hidState;
 
+void ParseButtonEvent(const LInput::EventType eventType , int deviceID, std::string buttonName, int pressCounter, int repeatCounter, int counter)
+{
+	using namespace LInput;
+	std::string nameofEvent = eventType == EventType::Pressed ? " Pressed" : " Released";
+	std::string msg = std::to_string(counter) + " [Device ID:" + std::to_string(deviceID) + "] " + buttonName + " " + nameofEvent + " press count: " + std::to_string(pressCounter) +
+		" repeat count: " + std::to_string(repeatCounter) + '\n';
+	std::cout << msg;
+
+}
+
 void OnKeyBoardEvent(const LInput::ButtonStdExtension<uint16_t>::ButtonEvent& btnEvent)
 {
 	using namespace  LInput;
 	static int c = 0;
 	c++;
-
+	
 	std::string buttonName = KeyCodeHelper::KeyCodeToString(static_cast<KeyCode>(btnEvent.button));
-	std::string nameofEvent = btnEvent.eventType == ButtonStdExtension<uint16_t>::EventType::Pressed ? " Pressed" : " Released";
-	std::string msg = std::to_string(c) + " [Device ID:" + std::to_string(btnEvent.parent->GetID()) + "] " + buttonName + " " + nameofEvent + " press count: " + std::to_string(btnEvent.counter) + 
-		" repeat count: " + std::to_string(btnEvent.repeatCount) + '\n';
+	ParseButtonEvent(btnEvent.eventType,btnEvent.parent->GetID(), buttonName, btnEvent.counter,btnEvent.repeatCount,c);
 
-	std::cout << msg.c_str();
+	
 	//OutputDebugStringA(msg.c_str());
 	if (static_cast<KeyCode>(btnEvent.button) == KeyCode::Q && btnEvent.counter >= 2)
 		PostQuitMessage(0);
@@ -80,13 +88,7 @@ void OnMouseEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEve
 	c++;
 
 	std::string buttonName =  MouseCodeHelper::MouseCodeToString(static_cast<MouseButton>(btnEvent.button));
-	std::string nameofEvent = btnEvent.eventType == ButtonStdExtension<uint8_t>::EventType::Pressed ? " Pressed" : " Released";
-	std::string msg = std::to_string(c) + " [Device ID:" + std::to_string(btnEvent.parent->GetID()) + "] " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
-
-	
-
-	std::cout << msg.c_str();
-	//OutputDebugStringA(msg.c_str());
+	ParseButtonEvent(btnEvent.eventType, btnEvent.parent->GetID(), buttonName, btnEvent.counter, btnEvent.repeatCount, c);
 }
 
 void OnHIDEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEvent)
@@ -97,12 +99,7 @@ void OnHIDEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEvent
 	using namespace std::string_literals;
 	
 	std::string buttonName = "HID Button "s + std::to_string(static_cast<int>( btnEvent.button));
-
-	std::string nameofEvent = btnEvent.eventType == ButtonStdExtension<uint8_t>::EventType::Pressed ? " Pressed" : " Released";
-
-	std::string msg = std::to_string(c) + " [Device ID:" + std::to_string(btnEvent.parent->GetID()) + "] " + buttonName + " " + nameofEvent + " " + std::to_string(btnEvent.counter) + "\n";
-
-	std::cout << msg.c_str();
+	ParseButtonEvent(btnEvent.eventType, btnEvent.parent->GetID(), buttonName, btnEvent.counter, btnEvent.repeatCount, c);
 }
 
 
