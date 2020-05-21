@@ -370,22 +370,24 @@ namespace LInput
             evnt.deltaY = mouse.lLastY;
 			evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice));
             evnt.deviceType = RawInputDeviceType::Mouse;
-            if (mouse.ulButtons & RI_MOUSE_WHEEL)
-                evnt.wheelDelta = static_cast<int16_t>(mouse.usButtonData) / WHEEL_DELTA;
-
-            for (size_t i = 0; i < MaxMouseButtons; i++)
+            if (mouse.usButtonFlags == RI_MOUSE_WHEEL)
             {
-
-                State& state = evnt.buttonState[i];
-         
-                if (mouse.ulButtons & (1ul << (i * 2)))
-                    state = State::Down;
-
-
-                
-                if (mouse.ulButtons & (2ul << (i * 2)))
-                    state = State::Up;
+                evnt.wheelDelta = static_cast<int16_t>(mouse.usButtonData) / WHEEL_DELTA;
             }
+            else
+            {
+                for (size_t i = 0; i < MaxMouseButtons; i++)
+                {
+                    State& state = evnt.buttonState[i];
+
+                    if (mouse.usButtonFlags & (1ul << (i * 2)))
+                        state = State::Down;
+
+                    if (mouse.usButtonFlags & (2ul << (i * 2)))
+                        state = State::Up;
+                }
+            }
+
             OnInput.Raise(evnt);
         }
 
@@ -574,7 +576,11 @@ namespace LInput
         }
 
     private:
+#if LLUTILS_CHARSET == LLUTILS_CHARSET_UNICODE
         static constexpr wchar_t sCurrentInstanceName[] = L"__LINPUT_CURRENT_INSTANCE__";
+#else
+        static constexpr char sCurrentInstanceName[] = "__LINPUT_CURRENT_INSTANCE__";
+#endif
 		using MapDeviceHandleToID = std::map<HRAWINPUT, uint8_t> ;
 		using MapDeviceNameToInfo = std::map<std::wstring, DeviceInfo>;
 		
