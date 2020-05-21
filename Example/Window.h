@@ -26,6 +26,7 @@ SOFTWARE.
 
 
 #include <windows.h>
+#include <LLUtils/StringDefs.h>
 #include <LLUtils/Buffer.h>
 #include <functional>
 namespace LInput::Win32
@@ -37,7 +38,8 @@ namespace LInput::Win32
         Window()
         {
             // Register the window class.
-            const wchar_t CLASS_NAME[] = L"Sample Window Class";
+        	
+            const LLUtils::native_char_type CLASS_NAME[] = LLUTILS_TEXT("Sample Window Class");
 
             WNDCLASS wc = { };
 
@@ -52,7 +54,7 @@ namespace LInput::Win32
             fHandle = CreateWindowEx(
                 0,                              // Optional window styles.
                 CLASS_NAME,                     // Window class
-                L"Learn to Program Windows",    // Window text
+                LLUTILS_TEXT("Learn to Program Windows"),    // Window text
                 WS_OVERLAPPEDWINDOW,            // Window style
 
                 // Size and position
