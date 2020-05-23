@@ -45,22 +45,6 @@ namespace LInput
 	
 	public:
 		using ButtonType = T;
-
-		static
-			LRESULT CALLBACK WindProc(
-				_In_ HWND hWnd,
-				_In_ UINT Msg,
-				_In_ WPARAM wParam,
-				_In_ LPARAM lParam)
-		{
-			switch (Msg)
-			{
-			case WM_USER + 1:
-				reinterpret_cast<ButtonStdExtension*>(wParam)->ProcessQueuedButtons();
-					break;
-			}
-			return DefWindowProc(hWnd, Msg, wParam, lParam);
-		}
 		
 		ButtonStdExtension(uint16_t id, uint16_t multipressRate, uint16_t repeatRate) :
 		  fID(id)
@@ -68,36 +52,7 @@ namespace LInput
 		, fRepeatRate(repeatRate)
 		{
 			timer.SetDelay(fRepeatRate);
-
-			const LLUtils::native_char_type CLASS_NAME[] = LLUTILS_TEXT("Btn extension");
-
-			WNDCLASS wc {};
-			wc.lpfnWndProc = WindProc;
-			wc.hInstance = GetModuleHandle(nullptr);
-			wc.lpszClassName = CLASS_NAME;
-			RegisterClass(&wc);
-			
-
-			// Create the window.
-
-			fWindowHandle 
-			= CreateWindowEx(
-				0,                              // Optional window styles.
-				CLASS_NAME,                     // Window class
-				LLUTILS_TEXT("Learn to Program Windows"),    // Window text
-				WS_OVERLAPPEDWINDOW,            // Window style
-
-				// Size and position
-				CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-
-				nullptr,       // Parent window    
-				nullptr,       // Menu
-				GetModuleHandle(nullptr),  // Instance handle
-				nullptr        // Additional application data
-			);
 		}
-		
-
 
 
 		///////////////////////
@@ -142,34 +97,25 @@ namespace LInput
 
 
 	public:
-
-
 		void ProcessQueuedButtons()
 		{
-			if (fPressedButtons.empty() == true)
+			for (auto& button : fPressedButtons)
 			{
-				timer.Enable(false);
-			}
-			else
-			{
-				for (auto& button : fPressedButtons)
-				{
-					auto& buttonData = GetButtonData(button);
-					auto now = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
+				auto& buttonData = GetButtonData(button);
+				auto now = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
 
-					if (now - buttonData.actuationTimeStamp > fRepeatRate)
-					{
-						buttonData.repeatCount++;
-						OnButtonEvent.Raise(ButtonEvent{ this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount });
-						buttonData.actuationTimeStamp = now;
-					}
+				if (now - buttonData.actuationTimeStamp > fRepeatRate)
+				{
+					buttonData.repeatCount++;
+					OnButtonEvent.Raise(ButtonEvent{ this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount });
+					buttonData.actuationTimeStamp = now;
 				}
 			}
 		}
 		
 		void TimerCallback()
 		{
-			SendMessage(fWindowHandle, WM_USER + 1, reinterpret_cast<WPARAM>(this), 0);
+			ProcessQueuedButtons();
 		}
 		
 		
@@ -206,18 +152,20 @@ namespace LInput
 				}
 				if (newState == State::Up)
 				{
-					OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Released,buttonData.pressCounter, buttonData.repeatCount });
-
-					
 					if (fEnableRepeat == true)
 					{
 						fPressedButtons.erase(button);
+						if (fPressedButtons.empty() == true)
+							timer.Enable(false);
+						
 						buttonData.actuationTimeStamp = 0;
 						buttonData.repeatCount = 0;
-						
-						if (multiPressTHreshold == false)
-							buttonData.pressCounter = 0;
 					}
+					
+					OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Released,buttonData.pressCounter, buttonData.repeatCount });
+					
+					if (multiPressTHreshold == false)
+						buttonData.pressCounter = 0;
 
 				}
 
@@ -229,7 +177,6 @@ namespace LInput
 	private:
 		
 		::Win32::HighPrecisionTimer timer = ::Win32::HighPrecisionTimer(std::bind(&ButtonStdExtension::TimerCallback, this));
-		HWND fWindowHandle = nullptr;
 		LLUtils::StopWatch fTimer = LLUtils::StopWatch(true);
 		using MapButtonToData = std::map<uint16_t, ButtonData>;
 		MapButtonToData mMapButttons;

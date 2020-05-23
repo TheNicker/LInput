@@ -23,7 +23,6 @@ SOFTWARE.
 #include <iostream>
 #include <array>
 #include <Windows.h>
-#include "Window.h"
 #include <LInput/Win32/RawInput/RawInput.h>
 #include <LInput/Buttons/IButtonable.h>
 #include <LInput/Buttons/ButtonStates.h>
@@ -207,9 +206,7 @@ int main()
 
 	using namespace LInput;
 	
-	LInput::Win32::Window window;
-	
-	RawInput rawInput(window.GetHandle());
+	RawInput rawInput;
 
 	// Add devices
 	rawInput.AddDevice(RawInput::UsagePage::GenericDesktopControls, RawInput::GenericDesktopControlsUsagePage::Mouse, RawInput::Flags::EnableBackground);

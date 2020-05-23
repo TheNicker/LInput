@@ -21,8 +21,6 @@ SOFTWARE.
 */
 
 #pragma once
-
-#include <vector>
 #include <array>
 #include <climits>
 #include <map>
@@ -34,8 +32,6 @@ SOFTWARE.
 #include <LLUtils/Buffer.h>
 #include <LInput/Buttons/ButtonType.h>
 #include <LInput/Keys/KeyCodeHelper.h>
-#include <LInput/Mouse/MouseCode.h>
-
 
 #include <type_traits>
 
@@ -169,55 +165,58 @@ namespace LInput
 
         OnInputType OnInput;
 
-        RawInput(HWND hwnd)  : fIds(1)
+        RawInput()  : fIds(1)
         {
-            AttachWindow(hwnd);
+            RegisterWindow();
         }
 
-        template <bool allowThrow = true>
-        void DetachCurrentWindow()
+
+        void UnregisterWindow()
         {
             if (fWindowHandle != nullptr)
             {
-                Enable(false);
-                if (RemoveProp(fWindowHandle, sCurrentInstanceName) == nullptr)
-                {
-                    if (allowThrow)
-                        LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Cannot remove property from window");
-                }
-                fWindowHandle = nullptr;
-                for (const auto& p : fDevicehHandleToID)
-                    fIds.Release(p.second);
-
-                fIds.Normalize();
-
-                if (allowThrow)
-                if (fIds.GetNextID() != fIds.GetStartID())
-                    LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Missing ID's that should have been released");
-
-
-                fDevicehHandleToID.clear();
-                fDeviceNameToInfo.clear();
-                fWindowHandle = nullptr;
+                DestroyWindow(fWindowHandle);
+                UnregisterClass(CLASS_NAME, GetModuleHandle(nullptr));
+				fWindowHandle = nullptr;
             }
         }
-
-
-        void AttachWindow(HWND hwnd)
+    	
+    	
+        void RegisterWindow()
         {
-            DetachCurrentWindow<true>();
-            fWindowHandle = hwnd;
-            
-            if (SetProp(hwnd, sCurrentInstanceName, (HANDLE)this) == 0)
-                LL_EXCEPTION_SYSTEM_ERROR("could not set window property");
-            Enable(true);
+            WNDCLASS wc{};
+            wc.lpfnWndProc = WndProc;
+            wc.hInstance = GetModuleHandle(nullptr);
+            wc.lpszClassName = CLASS_NAME;
+            RegisterClass(&wc);
+
+
+            // Create the window.
+
+            fWindowHandle
+                = CreateWindowEx(
+                    0,                              // Optional window styles.
+                    CLASS_NAME,                     // Window class
+                    nullptr,    // Window text
+                    WS_OVERLAPPEDWINDOW,            // Window style
+
+                    // Size and position
+                    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+
+                    nullptr,       // Parent window    
+                    nullptr,       // Menu
+                    GetModuleHandle(nullptr),  // Instance handle
+                    this        // Additional application data
+                );
+
+        	if (SetProp(fWindowHandle, sCurrentInstanceName, (HANDLE)this) == 0)
+                LL_EXCEPTION_SYSTEM_ERROR("could not set window property"); 
         }
 
         ~RawInput()
         {
-            DetachCurrentWindow<false>();
+            UnregisterWindow();
         }
-
 
         void HandleRawInputKeyboard(RAWINPUTHEADER& header, RAWKEYBOARD& rawKeyboard)
         {
@@ -420,7 +419,7 @@ namespace LInput
         }
 
 
-        void ProcessWInMessages([[maybe_unused]] HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+        LRESULT ProcessWInMessages([[maybe_unused]] HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
         {
             switch (msg)
             {
@@ -445,7 +444,7 @@ namespace LInput
                 }
 
                 ProcessRawInputMessage(reinterpret_cast<RAWINPUT*>(lpb.data()));
-                break;
+                return 0;
             }
 
             case WM_INPUT_DEVICE_CHANGE:
@@ -498,100 +497,45 @@ namespace LInput
                 }
             }
 
-            break;
+
+            return  0;
 
             }
+
+            return DefWindowProc(hwnd, msg, wparam, lparam);
         }
 
         static  LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
         {
             RawInput* _this = reinterpret_cast<RawInput*>(GetProp(hwnd, sCurrentInstanceName));
-            _this->ProcessWInMessages(hwnd, msg, wparam, lparam);
-
-            return _this->fLastWndProc(hwnd, msg, wparam, lparam);
+            return _this->ProcessWInMessages(hwnd, msg, wparam, lparam);
         }
 
+        
 
-#if 0 
-       static LRESULT HookProcedure(int code, WPARAM wParam, LPARAM lParam)
+    	bool Enabled() const
         {
-
-            if (code < 0)
-                return CallNextHookEx(fHook, code, wParam, lParam);
-
-            CWPRETSTRUCT* sa = reinterpret_cast<PCWPRETSTRUCT>(lParam);
-            CWPRETSTRUCT& s = *sa;
-            
-            if (s.message == WM_SIZE)
-            {
-                int k = 0;
-            }
-            RawInput* _this = reinterpret_cast<RawInput*>(GetProp(s.hwnd, sCurrentInstanceName));
-            if ( _this != nullptr)
-                _this->ProcessWInMessages(s.hwnd, s.message, s.wParam ,s.lParam);
-
-             return CallNextHookEx(fHook, code,wParam, lParam);
-       }
-#endif
-
-
-        
-
-        
-
+            return fEnabled;
+        }
+    	
         void Enable(bool enable)
         {
-#if 0 
-            if (fWindowHandle != nullptr) 
-            {
-                if (enable == true && fHook == nullptr)
-                    fHook =  SetWindowsHookEx(WH_GETMESSAGE, reinterpret_cast<HOOKPROC>(&HookProcedure), nullptr, GetCurrentThreadId());
-                else if (enable == false && fHook != nullptr)
-                {
-                    UnhookWindowsHookEx(fHook);
-                    fHook = nullptr;
-                }
-            }
-#else 
-            //Change WindowProc directly.
-            
-            if (fWindowHandle != nullptr) // Enable or disable only if window is attached
-            {
-                if (enable == true && fLastWndProc == nullptr)
-                {
-                    fLastWndProc = (WNDPROC)SetWindowLongPtr(fWindowHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&WndProc));
-
-                    if (fLastWndProc == nullptr)
-                        LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not get set custom window procedure");
-                }
-                else if (enable == false && fLastWndProc != nullptr)
-                {
-                    if (SetWindowLongPtr(fWindowHandle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(fLastWndProc)) != reinterpret_cast<LONG_PTR>(&WndProc))
-                        LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not restore original window procedure");
-
-                    fLastWndProc = nullptr;
-                }
-            }
-#endif
+            fEnabled = enable;
         }
 
     private:
-#if LLUTILS_CHARSET == LLUTILS_CHARSET_UNICODE
-        static constexpr wchar_t sCurrentInstanceName[] = L"__LINPUT_CURRENT_INSTANCE__";
-#else
-        static constexpr char sCurrentInstanceName[] = "__LINPUT_CURRENT_INSTANCE__";
-#endif
-		using MapDeviceHandleToID = std::map<HRAWINPUT, uint8_t> ;
+
+        static inline const LLUtils::native_char_type CLASS_NAME[] = LLUTILS_TEXT("LInput.RawInput");
+        static constexpr LLUtils::native_char_type sCurrentInstanceName[] = LLUTILS_TEXT("__LINPUT_CURRENT_INSTANCE__");
+
+    	using MapDeviceHandleToID = std::map<HRAWINPUT, uint8_t> ;
 		using MapDeviceNameToInfo = std::map<std::wstring, DeviceInfo>;
 		
         MapDeviceHandleToID fDevicehHandleToID;
         MapDeviceNameToInfo fDeviceNameToInfo;
 		LLUtils::UniqueIdProvider<uint8_t> fIds;
+        bool fEnabled = false;
         HWND fWindowHandle = nullptr;
-#if 0
-        static inline HHOOK fHook = nullptr;
-#endif
-        WNDPROC fLastWndProc = nullptr;
     };
     
 }
