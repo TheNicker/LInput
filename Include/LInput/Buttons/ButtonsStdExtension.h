@@ -175,15 +175,14 @@ namespace LInput
 
 		}
 	private:
-		
+		uint16_t fID = 0;
+		uint16_t fMultiPressRate = 250;
+		uint16_t fRepeatRate = 15;
 		::Win32::HighPrecisionTimer timer = ::Win32::HighPrecisionTimer(std::bind(&ButtonStdExtension::TimerCallback, this));
 		LLUtils::StopWatch fTimer = LLUtils::StopWatch(true);
 		using MapButtonToData = std::map<uint16_t, ButtonData>;
 		MapButtonToData mMapButttons;
 		std::set<ButtonType> fPressedButtons;
-		uint16_t fMultiPressRate = 250;
-		uint16_t fRepeatRate = 15;
 		bool fEnableRepeat = true;
-		uint16_t fID = 0;
 	};
 }

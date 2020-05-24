@@ -479,7 +479,7 @@ namespace LInput
 
                     //Remove old handle if exists.
 
-                    for (const auto p : fDevicehHandleToID)
+                    for (const auto& p : fDevicehHandleToID)
                     {
                         if (p.second == id)
                         {
