@@ -6,7 +6,6 @@ cmake_minimum_required (VERSION 3.8)
 
 set(CMAKE_CXX_STANDARD 17)
 include_directories(./LLUtils/Include)
-include_directories(d:/development/Win32/Win32/Include)
 
 # Add source to this project's executable.
 add_executable (LInputExample "Example.cpp")
