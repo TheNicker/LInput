@@ -1,0 +1,6 @@
+[submodule "External/Win32"]
+	path = External/Win32
+	url = git@github.com:TheNicker/Win32.git
+[submodule "External/LLUtils"]
+	path = External/LLUtils
+	url = git@github.com:TheNicker/LLUtils.git
