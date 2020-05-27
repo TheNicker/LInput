@@ -65,6 +65,7 @@ namespace LInput
 			EventType eventType;
 			uint16_t counter;
 			uint16_t repeatCount;
+			uint16_t actuationTime;
 
 		};
 
@@ -79,6 +80,7 @@ namespace LInput
 			State buttonState;
 			uint16_t pressCounter;
 			uint64_t actuationTimeStamp;
+			uint64_t repeatTimeStamp;
 			uint16_t repeatCount;
 		};
 
@@ -104,11 +106,11 @@ namespace LInput
 				auto& buttonData = GetButtonData(button);
 				auto now = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
 
-				if (now - buttonData.actuationTimeStamp > fRepeatRate)
+				if (now - buttonData.repeatTimeStamp > fRepeatRate)
 				{
 					buttonData.repeatCount++;
-					OnButtonEvent.Raise(ButtonEvent{ this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount });
-					buttonData.actuationTimeStamp = now;
+					OnButtonEvent.Raise(ButtonEvent{ this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount , static_cast<uint16_t>(now - buttonData.actuationTimeStamp)});
+					buttonData.repeatTimeStamp = now;
 				}
 			}
 		}
@@ -143,10 +145,11 @@ namespace LInput
 						{
 							fPressedButtons.insert(button);
 							buttonData.actuationTimeStamp = currentTimeStamp;
+							buttonData.repeatTimeStamp = currentTimeStamp;
 							timer.Enable(true);
 						}
 
-						OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount });
+						OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount ,static_cast<uint16_t>(currentTimeStamp - buttonData.actuationTimeStamp) });
 
 					}
 				}
@@ -159,10 +162,11 @@ namespace LInput
 							timer.Enable(false);
 						
 						buttonData.actuationTimeStamp = 0;
+						buttonData.repeatTimeStamp = 0;
 						buttonData.repeatCount = 0;
 					}
 					
-					OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Released,buttonData.pressCounter, buttonData.repeatCount });
+					OnButtonEvent.Raise(ButtonEvent{this, 0,button,EventType::Released,buttonData.pressCounter, buttonData.repeatCount ,0});
 					
 					if (multiPressTHreshold == false)
 						buttonData.pressCounter = 0;

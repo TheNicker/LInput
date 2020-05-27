@@ -1,4 +1,4 @@
-/*
+﻿/*
 Copyright (c) 2020 Lior Lahav
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,7 +31,6 @@ SOFTWARE.
 #include <LInput/Keys/KeyCombination.h>
 #include <LInput/Mouse/MouseCode.h>
 #include <LInput/Mouse/MouseCodeHelper.h>
-#include <Win32/HighPrecisionTimer.h>
 
 
 //button support for multiple keyboards
@@ -51,40 +50,17 @@ using HIDGroup = DeviceGroup<HIDButtonState>;
 KeyboardGroup keyboardState;
 MouseGroup mouseState;
 HIDGroup hidState;
-::Win32::HighPrecisionTimer* timer = nullptr;
-LONG dx = 0;
-LONG dy = 0;
+uint16_t multiPressRate = 250;
+uint16_t repeatRate = 2;
 
-void SynthesizeMouseMove(int dx, int dy)
-{
-	return;
-	if (dx != 0 || dy != 0)
-	{
-		INPUT input{};
-		auto& mi = input.mi;
-		mi.dwFlags = MOUSEEVENTF_MOVE;
 
-		mi.dx = dx;
-		mi.dy = dy;
-
-		SendInput(1, &input, sizeof(INPUT));
-	}
-}
-
-void OnTimer()
-{
-	if (dx != 0 || dy != 0)
-		SynthesizeMouseMove(dx, dy);
-	else
-		timer->Enable(false);
-}
-
-void ParseButtonEvent(const LInput::EventType eventType , int deviceID, std::string buttonName, int pressCounter, int repeatCounter, int counter)
+void ParseButtonEvent(const LInput::EventType eventType , int deviceID, std::string buttonName, int pressCounter
+	, int repeatCounter, int counter, int actuationTime)
 {
 	using namespace LInput;
 	std::string nameofEvent = eventType == EventType::Pressed ? " Pressed" : " Released";
 	std::string msg = std::to_string(counter) + " [Device ID:" + std::to_string(deviceID) + "] " + buttonName + " " + nameofEvent + " press count: " + std::to_string(pressCounter) +
-		" repeat count: " + std::to_string(repeatCounter) + '\n';
+		" repeat count: " + std::to_string(repeatCounter) + " actuation time: " + std::to_string(actuationTime) + "ms" + '\n';
 	std::cout << msg;
 
 }
@@ -94,12 +70,10 @@ void OnKeyBoardEvent(const LInput::ButtonStdExtension<uint16_t>::ButtonEvent& bt
 	using namespace  LInput;
 	static int c = 0;
 	c++;
-	
-	std::string buttonName = KeyCodeHelper::KeyCodeToString(static_cast<KeyCode>(btnEvent.button));
-	ParseButtonEvent(btnEvent.eventType,btnEvent.parent->GetID(), buttonName, btnEvent.counter,btnEvent.repeatCount,c);
 
-	
-	//OutputDebugStringA(msg.c_str());
+	std::string buttonName = KeyCodeHelper::KeyCodeToString(static_cast<KeyCode>(btnEvent.button));
+	ParseButtonEvent(btnEvent.eventType, btnEvent.parent->GetID(), buttonName, btnEvent.counter, btnEvent.repeatCount, c,btnEvent.actuationTime);
+
 	if (static_cast<KeyCode>(btnEvent.button) == KeyCode::Q && btnEvent.counter >= 2)
 		PostQuitMessage(0);
 }
@@ -111,7 +85,7 @@ void OnMouseEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEve
 	c++;
 
 	std::string buttonName =  MouseCodeHelper::MouseCodeToString(static_cast<MouseButton>(btnEvent.button));
-	ParseButtonEvent(btnEvent.eventType, btnEvent.parent->GetID(), buttonName, btnEvent.counter, btnEvent.repeatCount, c);
+	ParseButtonEvent(btnEvent.eventType, btnEvent.parent->GetID(), buttonName, btnEvent.counter, btnEvent.repeatCount, c, btnEvent.actuationTime);
 }
 
 void OnHIDEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEvent)
@@ -122,35 +96,7 @@ void OnHIDEvent(const LInput::ButtonStdExtension<uint8_t>::ButtonEvent& btnEvent
 	using namespace std::string_literals;
 	
 	std::string buttonName = "HID Button "s + std::to_string(static_cast<int>( btnEvent.button));
-	ParseButtonEvent(btnEvent.eventType, btnEvent.parent->GetID(), buttonName, btnEvent.counter, btnEvent.repeatCount, c);
-
-	if (btnEvent.repeatCount == 0)
-	{
-		if (btnEvent.button == 1)
-		{
-			if (btnEvent.eventType == EventType::Pressed)
-			{
-				mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0);
-			}
-			else if (btnEvent.eventType == EventType::Released)
-			{
-				mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
-			}
-		}
-		if (btnEvent.button == 2)
-		{
-			if (btnEvent.eventType == EventType::Pressed)
-			{
-				mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0);
-			}
-			else if (btnEvent.eventType == EventType::Released)
-			{
-				mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0);
-			}
-		}
-	}
-
-	
+	ParseButtonEvent(btnEvent.eventType, btnEvent.parent->GetID(), buttonName, btnEvent.counter, btnEvent.repeatCount, c, btnEvent.actuationTime);
 }
 
 
@@ -187,7 +133,7 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 		{
 			it = keyboardState.emplace(evnt.deviceIndex, decltype(keyboardState)::mapped_type()).first;
 			
-			std::shared_ptr<ButtonStdExtension<uint16_t>> stdExtension = std::make_shared<ButtonStdExtension<uint16_t>>(evnt.deviceIndex,250,10);
+			std::shared_ptr<ButtonStdExtension<uint16_t>> stdExtension = std::make_shared<ButtonStdExtension<uint16_t>>(evnt.deviceIndex,multiPressRate,repeatRate);
 			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint16_t>>(stdExtension));
 			stdExtension->OnButtonEvent.Add(std::bind(&OnKeyBoardEvent, std::placeholders::_1));
 		}
@@ -209,7 +155,7 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 		{
 			it = mouseState.emplace(evnt.deviceIndex, decltype(mouseState)::mapped_type()).first;
 
-			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex,250,10);
+			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex, multiPressRate, repeatRate);
 			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtension));
 			stdExtension->OnButtonEvent.Add(std::bind(&OnMouseEvent, std::placeholders::_1));
 		}
@@ -237,7 +183,7 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 		{
 			it = hidState.emplace(evnt.deviceIndex, decltype(hidState)::mapped_type()).first;
 
-			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex,250 ,10);
+			auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex, multiPressRate, repeatRate);
 			it->second.AddExtension(std::static_pointer_cast<IButtonable<uint8_t>>(stdExtension));
 			stdExtension->OnButtonEvent.Add(std::bind(&OnHIDEvent, std::placeholders::_1));
 		}
@@ -246,56 +192,6 @@ void OnRawInput(const LInput::RawInput::RawInputEvent& evnt)
 
 		for (size_t i = 0; i < RawInput::MaxHIDButtons; i++)
 			it->second.SetButtonState(static_cast<decltype(hidState)::mapped_type::ButtonType>(i), hidEvent.buttonState[i]);
-
-
-
-		const double maxSpeed = 10.0;
-		auto xAxis = hidEvent.axes.at(RawInput::Axes::X);
-		auto yAxis = hidEvent.axes.at(RawInput::Axes::Y);
-
-		double normalizedX = xAxis / 128.0;
-		double normalizedY = yAxis / 128.0;
-
-		auto Sign = [](double num)->double
-		{
-			if (num < 0) return -1;
-			else return 1;
-		};
-		
-		/*if (std::abs(normalizedX) < 0.1)
-			normalizedX = 0;
-
-		if (std::abs(normalizedY) < 0.1)
-			normalizedY = 0;*/
-		
-		normalizedX = Sign(normalizedX) * std::abs(normalizedX * normalizedX);
-		normalizedY = Sign(normalizedY) * std::abs(normalizedY * normalizedY);
-		dx = static_cast<DWORD>(normalizedX * maxSpeed);
-		dy = static_cast<DWORD>(normalizedY * maxSpeed);
-
-		std::cout << "dx: " << dx << " dy: " << dy << std::endl;
-
-
-		if (dx != 0 || dy != 0)
-			SynthesizeMouseMove(dx, dy);
-
-
-		if (timer == nullptr)
-		{
-			timer = new ::Win32::HighPrecisionTimer(OnTimer);
-			timer->SetDelay(15);
-		}
-		
-		timer->Enable(true);
-		
-//		mouse_event(,dx ,dy, 0, 0);
-		
-	/*	std::cout << std::endl << "X: " << (int)hidEvent.axes[RawInput::Axes::X] << " Y: " << (int)hidEvent.axes[RawInput::Axes::Y]
-			<< " Z: " << (int)hidEvent.axes[RawInput::Axes::Z] << " RZ: " << (int)hidEvent.axes[RawInput::Axes::ZRotate] << " Hat: " << (int)hidEvent.axes[RawInput::Axes::HatSwitch];
-		*/	 
-	
-		//
-		//std::cout << std::endl << "X: " << (int)hidEvent.buttonState[0];
 	}
 }
 
