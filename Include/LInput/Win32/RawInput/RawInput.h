@@ -505,7 +505,7 @@ namespace LInput
             return DefWindowProc(hwnd, msg, wparam, lparam);
         }
 
-        static  LRESULT WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+        static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
         {
             RawInput* _this = reinterpret_cast<RawInput*>(GetProp(hwnd, sCurrentInstanceName));
             return _this->ProcessWInMessages(hwnd, msg, wparam, lparam);
