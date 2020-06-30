@@ -42,7 +42,8 @@ namespace LInput
 	class IButtonable
 	{
 	public:
-		virtual void SetButtonState(T button, State  oldstate, State newState) = 0;
+		virtual void SetButtonState(T button, State newState) = 0;
+		virtual ~IButtonable(){}
 	};
 
 
@@ -52,6 +53,7 @@ namespace LInput
 	public:
 		virtual void SetButtonState(T button, State state) = 0;
 		virtual State GetButtonState(T button) const = 0;
+		virtual ~IButtonState() = default;
 	};
 
 

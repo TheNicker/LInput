@@ -26,7 +26,7 @@ SOFTWARE.
 #include "KeyCode.h"
 
 #ifdef _WIN32
-#include <windows.h>
+#include <Windows.h>
 #endif
 
 namespace LInput
@@ -103,7 +103,7 @@ namespace LInput
         static KeyCode KeyCodeFromVK(uint32_t key, uint32_t params)
         {
             KeyEventParams* keydown = reinterpret_cast<KeyEventParams*>(&params);
-            uint16_t scanCode = ((keydown->isExtented == true ? 0xe0 : 0)  << 8) |  MapVirtualKey(key, MAPVK_VK_TO_VSC_EX);
+            uint16_t scanCode = static_cast<uint16_t>( ((keydown->isExtented == true ? 0xe0u : 0u)  << 8u) |  MapVirtualKey(key, MAPVK_VK_TO_VSC_EX));
             return   static_cast<KeyCode>(scanCode);
         }
 

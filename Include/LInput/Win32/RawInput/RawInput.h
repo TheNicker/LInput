@@ -98,7 +98,7 @@ namespace LInput
         };
 		
 		//Add support Enum class support for bitflags
-		LLUTILS_DEFINE_ENUM_CLASS_FLAG_OPERATIONS_IN_CLASS(Flags);
+		LLUTILS_DEFINE_ENUM_CLASS_FLAG_OPERATIONS_IN_CLASS(Flags)
 
 
         struct RawInputDevice
@@ -126,7 +126,7 @@ namespace LInput
         struct RawInputEvent
         {
             RawInputDeviceType deviceType;
-            int deviceIndex;
+            uint8_t deviceIndex;
 
         };
         struct RawInputEventKeyBoard : public RawInputEvent
@@ -209,7 +209,7 @@ namespace LInput
                     this        // Additional application data
                 );
 
-        	if (SetProp(fWindowHandle, sCurrentInstanceName, (HANDLE)this) == 0)
+        	if (SetProp(fWindowHandle, sCurrentInstanceName, reinterpret_cast<HANDLE>(this)) == 0)
                 LL_EXCEPTION_SYSTEM_ERROR("could not set window property"); 
         }
 
@@ -266,20 +266,20 @@ namespace LInput
 
             UINT                 bufferSize;
             if (GetRawInputDeviceInfo(header.hDevice,
-                RIDI_PREPARSEDDATA, NULL, &bufferSize) != 0)
+                RIDI_PREPARSEDDATA, nullptr, &bufferSize) != 0)
                 LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not get input device info");
 
             LLUtils::Buffer preparseData(bufferSize);
 
 
-            if (GetRawInputDeviceInfo(header.hDevice, RIDI_PREPARSEDDATA, (void*)preparseData.data(), &bufferSize) != bufferSize)
+            if (GetRawInputDeviceInfo(header.hDevice, RIDI_PREPARSEDDATA, reinterpret_cast<void*>(preparseData.data()), &bufferSize) != bufferSize)
                 LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not get input device info");
 
 
 
             HIDP_CAPS caps;
             // Button caps
-            if (HidP_GetCaps((PHIDP_PREPARSED_DATA)preparseData.data(), &caps) != HIDP_STATUS_SUCCESS)
+            if (HidP_GetCaps(reinterpret_cast<PHIDP_PREPARSED_DATA>(preparseData.data()), &caps) != HIDP_STATUS_SUCCESS)
                 LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Unable to retrieve caps");
 
             //
@@ -293,15 +293,15 @@ namespace LInput
             std::unique_ptr<HIDP_BUTTON_CAPS[]> pButtonCaps = std::make_unique< HIDP_BUTTON_CAPS[]>(caps.NumberInputButtonCaps);
 
 
-            if (HidP_GetButtonCaps(HidP_Input, pButtonCaps.get(), &capsLength, (PHIDP_PREPARSED_DATA)preparseData.data()) != HIDP_STATUS_SUCCESS)
+            if (HidP_GetButtonCaps(HidP_Input, pButtonCaps.get(), &capsLength, reinterpret_cast<PHIDP_PREPARSED_DATA>(preparseData.data())) != HIDP_STATUS_SUCCESS)
                 LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Unable to retrieve button caps");
 
-            INT g_NumberOfButtons = pButtonCaps.get()->Range.UsageMax - pButtonCaps.get()->Range.UsageMin + 1;
+            USHORT g_NumberOfButtons = pButtonCaps.get()->Range.UsageMax - pButtonCaps.get()->Range.UsageMin + 1;
 
             // Value caps
             std::unique_ptr<HIDP_VALUE_CAPS[]> pValueCaps = std::make_unique< HIDP_VALUE_CAPS[]>(caps.NumberInputValueCaps);
             capsLength = caps.NumberInputValueCaps;
-            if (HidP_GetValueCaps(HidP_Input, pValueCaps.get(), &capsLength, (PHIDP_PREPARSED_DATA)preparseData.data()) != HIDP_STATUS_SUCCESS)
+            if (HidP_GetValueCaps(HidP_Input, pValueCaps.get(), &capsLength, reinterpret_cast<PHIDP_PREPARSED_DATA>(preparseData.data())) != HIDP_STATUS_SUCCESS)
                 LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Unable to retrieve value caps");
 
                 //
@@ -310,8 +310,8 @@ namespace LInput
 
             usageLength = g_NumberOfButtons;
             if (HidP_GetUsages(
-                    HidP_Input, pButtonCaps.get()->UsagePage, 0, usage.data(), &usageLength, (PHIDP_PREPARSED_DATA)preparseData.data(),
-                    (PCHAR)rawHID.bRawData, rawHID.dwSizeHid
+                    HidP_Input, pButtonCaps.get()->UsagePage, 0, usage.data(), &usageLength, reinterpret_cast<PHIDP_PREPARSED_DATA>(preparseData.data()),
+                    reinterpret_cast<PCHAR>(rawHID.bRawData), rawHID.dwSizeHid
                 ) != HIDP_STATUS_SUCCESS)
                 LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Unable to retrieve usage values");
 
@@ -327,8 +327,8 @@ namespace LInput
             {
                 
                 if (HidP_GetUsageValue(
-                    HidP_Input, pValueCaps[i].UsagePage, 0, pValueCaps[i].Range.UsageMin, &value, (PHIDP_PREPARSED_DATA)preparseData.data(),
-                    (PCHAR)rawHID.bRawData, rawHID.dwSizeHid
+                    HidP_Input, pValueCaps[i].UsagePage, 0, pValueCaps[i].Range.UsageMin, &value, reinterpret_cast<PHIDP_PREPARSED_DATA>(preparseData.data()),
+                    reinterpret_cast<PCHAR>(rawHID.bRawData), rawHID.dwSizeHid
                 ) != HIDP_STATUS_SUCCESS)
                     LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "Unable to retrieve usage values");
 
@@ -434,7 +434,7 @@ namespace LInput
                 LLUtils::Buffer lpb(dwSize);
 
 
-                if (GetRawInputData((HRAWINPUT)lparam,
+                if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lparam),
                     RID_INPUT,
                     lpb.data(),
                     &dwSize,

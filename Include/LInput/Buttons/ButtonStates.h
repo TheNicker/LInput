@@ -65,7 +65,7 @@ namespace LInput
 			{
 				fButtonStates[button] = newState;
 				for (std::shared_ptr<IButtonable<T>>& e : fButtonExtensions)
-					e->SetButtonState(button, oldState, newState);
+					e->SetButtonState(button, newState);
 
 			}
 		}

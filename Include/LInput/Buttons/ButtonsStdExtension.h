@@ -76,12 +76,12 @@ namespace LInput
 
 		struct ButtonData
 		{
-			uint64_t timeStamp;
-			State buttonState;
-			uint16_t pressCounter;
-			uint64_t actuationTimeStamp;
-			uint64_t repeatTimeStamp;
-			uint16_t repeatCount;
+			uint64_t timeStamp = 0;
+			State buttonState = State::Up;
+			uint16_t pressCounter = 0;
+			uint64_t actuationTimeStamp = 0;
+			uint64_t repeatTimeStamp = 0;
+			uint16_t repeatCount = 0;
 		};
 
 
@@ -91,7 +91,7 @@ namespace LInput
 		{
 			auto it = mMapButttons.find(buttonId);
 			if (it == mMapButttons.end())
-				it = mMapButttons.insert(std::make_pair(buttonId, ButtonData{ 0u, State::Up, 0 })).first;
+				it = mMapButttons.emplace(static_cast<uint16_t>(buttonId), ButtonData{}).first;
 
 			return it->second;
 		}
@@ -104,9 +104,9 @@ namespace LInput
 			for (auto& button : fPressedButtons)
 			{
 				auto& buttonData = GetButtonData(button);
-				auto now = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
+				uint64_t now = static_cast<uint64_t>(fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds));
 
-				if (now - buttonData.repeatTimeStamp > fRepeatRate)
+				if ( static_cast<uint64_t>(now) - buttonData.repeatTimeStamp > fRepeatRate)
 				{
 					buttonData.repeatCount++;
 					OnButtonEvent.Raise(ButtonEvent{ this, 0,button,EventType::Pressed,buttonData.pressCounter, buttonData.repeatCount , static_cast<uint16_t>(now - buttonData.actuationTimeStamp)});
@@ -123,10 +123,10 @@ namespace LInput
 		
 		uint16_t GetID() const { return fID; }
 		// Get the state of a button whether it's down or up
-		void SetButtonState(ButtonType button, State oldstate, State newState) override
+		void SetButtonState(ButtonType button, State newState) override
 		{
 			ButtonData& buttonData = GetButtonData(button);
-			uint64_t currentTimeStamp = fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds);
+			uint64_t currentTimeStamp = static_cast<uint64_t>(fTimer.GetElapsedTimeInteger(LLUtils::StopWatch::Milliseconds));
 			bool multiPressTHreshold = buttonData.timeStamp != 0 && (currentTimeStamp - buttonData.timeStamp) < fMultiPressRate;
 
 			if (buttonData.buttonState != newState)
