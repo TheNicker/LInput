@@ -30,7 +30,7 @@ SOFTWARE.
 #include <LLUtils/EnumClassBitwise.h>
 #include <LLUtils/UniqueIDProvider.h>
 #include <LLUtils/Buffer.h>
-#include <LInput/Buttons/ButtonType.h>
+#include <LInput/Buttons/ButtonState.h>
 #include <LInput/Keys/KeyCodeHelper.h>
 
 #include <type_traits>
@@ -131,7 +131,7 @@ namespace LInput
         };
         struct RawInputEventKeyBoard : public RawInputEvent
         {
-            State state;
+            ButtonState state;
             KeyCode scanCode;
         };
 
@@ -140,7 +140,7 @@ namespace LInput
             int deltaX;
             int deltaY;
             int16_t wheelDelta;
-            std::array<State, MaxMouseButtons> buttonState;
+            std::array<ButtonState, MaxMouseButtons> buttonState;
         };
 
         enum Axes
@@ -154,7 +154,7 @@ namespace LInput
         };
         struct RawInputEventHID : public RawInputEvent
         {
-            std::array<State, MaxHIDButtons> buttonState;
+            std::array<ButtonState, MaxHIDButtons> buttonState;
             std::array<int8_t, static_cast<size_t>(Axes::Count)> axes;
         };
 
@@ -221,11 +221,11 @@ namespace LInput
         void HandleRawInputKeyboard(RAWINPUTHEADER& header, RAWKEYBOARD& rawKeyboard)
         {
             RawInputEventKeyBoard keyEvent{};
-            auto evnt = KeyCodeHelper::KeyEventFromRawInput(rawKeyboard);
-            keyEvent.state = evnt.state;
+            auto [button, state] = KeyCodeHelper::KeyEventFromRawInput(rawKeyboard);
+            keyEvent.state = state;
 			keyEvent.deviceIndex = GetDeviceID(static_cast<HRAWINPUT> (header.hDevice));
             keyEvent.deviceType = RawInputDeviceType::Keyboard;
-            keyEvent.scanCode = evnt.keyCode;
+            keyEvent.scanCode = button;
             OnInput.Raise(keyEvent);
         }
 
@@ -252,7 +252,7 @@ namespace LInput
             RawInputEventHID evnt{ };
             evnt.deviceType = RawInputDeviceType::GamePad;
             evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice));
-            std::fill(std::begin(evnt.buttonState), std::end(evnt.buttonState), State::Up);
+            std::fill(std::begin(evnt.buttonState), std::end(evnt.buttonState), ButtonState::Up);
 
             USHORT               capsLength;
             
@@ -317,7 +317,7 @@ namespace LInput
 
 
             for (i = 0; i < usageLength; i++)
-                evnt.buttonState[usage[i] - pButtonCaps.get()->Range.UsageMin] = State::Down;
+                evnt.buttonState[usage[i] - pButtonCaps.get()->Range.UsageMin] = ButtonState::Down;
 
             //
             // Get the state of discrete-valued-controls
@@ -377,13 +377,13 @@ namespace LInput
             {
                 for (size_t i = 0; i < MaxMouseButtons; i++)
                 {
-                    State& state = evnt.buttonState[i];
+                    ButtonState& state = evnt.buttonState[i];
 
                     if (mouse.usButtonFlags & (1ul << (i * 2)))
-                        state = State::Down;
+                        state = ButtonState::Down;
 
                     if (mouse.usButtonFlags & (2ul << (i * 2)))
-                        state = State::Up;
+                        state = ButtonState::Up;
                 }
             }
 

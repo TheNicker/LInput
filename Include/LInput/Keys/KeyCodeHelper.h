@@ -24,6 +24,7 @@ SOFTWARE.
 #include <algorithm>
 #include <string>
 #include "KeyCode.h"
+#include "../Buttons/ButtonState.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -119,11 +120,11 @@ namespace LInput
 				;
 				
 		}
-
-		static KeyEvent KeyEventFromRawInput(const RAWKEYBOARD& keyboard)
+        
+		static std::pair< KeyCode, ButtonState> KeyEventFromRawInput(const RAWKEYBOARD& keyboard)
 		{
 			KeyCode keyCode  = KeyCodeFromRawInput(keyboard);
-			State state = ( (keyboard.Flags & RI_KEY_BREAK) != 0) ? State::Up : State::Down;
+			ButtonState state = ( (keyboard.Flags & RI_KEY_BREAK) != 0) ? ButtonState::Up : ButtonState::Down;
 
 			return {keyCode, state};
 		}

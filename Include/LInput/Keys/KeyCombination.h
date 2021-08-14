@@ -23,8 +23,7 @@ SOFTWARE.
 #include <string>
 #include <vector>
 #include "KeyCode.h"
-#include <LLUtils/StringUtility.h>
-#include <LLUtils/Exception.h>
+#include "KeyCodeHelper.h"
 
 #pragma pack(push, 1)
 namespace LInput
@@ -39,14 +38,14 @@ namespace LInput
             size_t operator()(const KeyCombination& key) const
             {
                 static_assert(sizeof(KeyCombination) <= sizeof(size_t)
-                    , "For the benefit of fast hashing the size of key combination must be less or equal to the size of size_t");
-                return static_cast<size_t>(key.keyValue);
+                    , "For the benefit of fast hashing the size of key combination must less or equal to the size of size_t");
+                return static_cast<size_t>(key.combinationID);
             }
         };
 
         bool operator ==( const KeyCombination& rhs) const
         {
-            return keyValue == rhs.keyValue;
+            return combinationID == rhs.combinationID;
         }
 
         static ListKeyCombinations  FromString(const std::string& string)
@@ -79,7 +78,7 @@ namespace LInput
                     duplicateCombinations2Darray.push_back({ KeyCode::ENTERMAIN, KeyCode::KEYPADENTER });
                 else
                 {
-                    KeyCode keyCode = KeyCodeHelper::KeyNameToKeyCode(key);
+                    KeyCode keyCode = LInput::KeyCodeHelper::KeyNameToKeyCode(key);
                     if (keyCode == KeyCode::UNASSIGNED)
                         LL_EXCEPTION(LLUtils::Exception::ErrorCode::BadParameters, std::string("The key name '") + key + "' could not be found");
                     combination.AssignKey(keyCode);
@@ -117,17 +116,18 @@ namespace LInput
 #ifdef _WIN32
         static KeyCombination FromVirtualKey(uint32_t key, uint32_t params)
         {
-            KeyCombination combination;
-            combination.leftAlt = (GetKeyState(VK_LMENU) & static_cast<USHORT>(0x8000)) != 0;
-            combination.rightAlt = (GetKeyState(VK_RMENU) & static_cast<USHORT>(0x8000)) != 0;
-            combination.leftCtrl = (GetKeyState(VK_LCONTROL) & static_cast<USHORT>(0x8000)) != 0;
-            combination.rightCtrl = (GetKeyState(VK_RCONTROL) & static_cast<USHORT>(0x8000)) != 0;
-            combination.leftShift = (GetKeyState(VK_LSHIFT) & static_cast<USHORT>(0x8000)) != 0;
-            combination.rightShift = (GetKeyState(VK_RSHIFT) & static_cast<USHORT>(0x8000)) != 0;
-            combination.leftWinKey = (GetKeyState(VK_LWIN) & static_cast<USHORT>(0x8000)) != 0;
-            combination.rightWinKey = (GetKeyState(VK_RWIN) & static_cast<USHORT>(0x8000)) != 0;
-            combination.keycode = KeyCodeHelper::KeyCodeFromVK(key, params);
-            return combination;
+	        KeyCombination combination;
+	        auto& flags = combination.keydata();
+	        flags.leftAlt = (GetKeyState(VK_LMENU) & static_cast<USHORT>(0x8000)) != 0;
+	        flags.rightAlt = (GetKeyState(VK_RMENU) & static_cast<USHORT>(0x8000)) != 0;
+	        flags.leftCtrl = (GetKeyState(VK_LCONTROL) & static_cast<USHORT>(0x8000)) != 0;
+	        flags.rightCtrl = (GetKeyState(VK_RCONTROL) & static_cast<USHORT>(0x8000)) != 0;
+	        flags.leftShift = (GetKeyState(VK_LSHIFT) & static_cast<USHORT>(0x8000)) != 0;
+	        flags.rightShift = (GetKeyState(VK_RSHIFT) & static_cast<USHORT>(0x8000)) != 0;
+	        flags.leftWinKey = (GetKeyState(VK_LWIN) & static_cast<USHORT>(0x8000)) != 0;
+	        flags.rightWinKey = (GetKeyState(VK_RWIN) & static_cast<USHORT>(0x8000)) != 0;
+	        flags.keycode = KeyCodeHelper::KeyCodeFromVK(key, params);
+	        return combination;
         }
 #endif
      
@@ -135,57 +135,63 @@ namespace LInput
     private:
         void AssignKey(KeyCode key)
         {
-            switch (key)
-            {
-            case KeyCode::LALT:
-                leftAlt = 1;
-                break;
-            case KeyCode::RALT:
-                rightAlt = 1;
-                break;
-            case KeyCode::RCONTROL:
-                rightCtrl = 1;
-                break;
-            case KeyCode::LCONTROL:
-                leftCtrl = 1;
-                break;
-            case KeyCode::RSHIFT:
-                rightShift = 1;
-                break;
-            case KeyCode::LSHIFT:
-                leftShift = 1;
-                break;
-            case KeyCode::RWIN:
-                rightWinKey = 1;
-                break;
-            case KeyCode::LWIN:
-                leftWinKey = 1;
-                break;
-            default:
-                //Not a modifer - assign key.
-                keycode = key;
-                break;
+        switch (key)
+        {
+        case KeyCode::LALT:
+            keydata().leftAlt = 1;
+            break;
+        case KeyCode::RALT:
+            keydata().rightAlt = 1;
+            break;
+        case KeyCode::RCONTROL:
+            keydata().rightCtrl = 1;
+            break;
+        case KeyCode::LCONTROL:
+            keydata().leftCtrl = 1;
+            break;
+        case KeyCode::RSHIFT:
+            keydata().rightShift = 1;
+            break;
+        case KeyCode::LSHIFT:
+            keydata().leftShift = 1;
+            break;
+        case KeyCode::RWIN:
+            keydata().rightWinKey = 1;
+            break;
+        case KeyCode::LWIN:
+            keydata().leftWinKey = 1;
+            break;
+        default:
+            //Not a modifer - assign key.
+            keydata().keycode = key;
+            break;
             }
         }
 
 #pragma region memeber fields
+#pragma pack(push,1)
+    public:
+        uint32_t combinationID = 0;
 
-        union
+        struct KeyCombinationFlags
         {
-            uint32_t keyValue = 0;
-            struct
-            {
-                KeyCode keycode;
-                unsigned char leftCtrl : 1;
-                unsigned char rightCtrl : 1;
-                unsigned char leftAlt : 1;
-                unsigned char rightAlt : 1;
-                unsigned char leftShift : 1;
-                unsigned char rightShift : 1;
-                unsigned char leftWinKey : 1;
-                unsigned char rightWinKey : 1;
-            };
+            KeyCode keycode;
+            unsigned char leftCtrl : 1;
+            unsigned char rightCtrl : 1;
+            unsigned char leftAlt : 1;
+            unsigned char rightAlt : 1;
+            unsigned char leftShift : 1;
+            unsigned char rightShift : 1;
+            unsigned char leftWinKey : 1;
+            unsigned char rightWinKey : 1;
+            unsigned char reserved : 8;
         };
+#pragma pack(pop)
+        KeyCombinationFlags& keydata()
+        {
+			static_assert(sizeof(uint32_t) == sizeof(KeyCombinationFlags), "Size mismatch");
+            return *reinterpret_cast<KeyCombinationFlags*>(&combinationID);
+        }
 
 #pragma endregion //memeber fields
     };

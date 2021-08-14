@@ -27,56 +27,66 @@ SOFTWARE.
 #include <map>
 #include <memory>
 #include <LLUtils/StopWatch.h>
-#include <LInput/Buttons/ButtonType.h>
-#include <LInput/Buttons/ButtonsStdExtension.h>
-#include <LInput/Buttons/IButtonable.h>
+#include <LInput/Buttons/ButtonState.h>
+#include <LInput/Buttons/IButtonStateExtension.h>
 #include <LLUtils/Event.h>
 
 namespace LInput
 {
-	template <typename T, size_t NUM_BUTTONS = MaxValue<T> >
-	class ButtonsState : public IButtonState<T>
+
+	template <typename button_type>
+	class IButtonState
 	{
 	public:
-		using underlying_type = T;
-		using ButtonType = T;
-		using VecButtonExtensions = std::vector<std::shared_ptr<IButtonable<T>>>;
+		virtual void SetButtonState(button_type button, ButtonState state) = 0;
+		virtual ButtonState GetButtonState(button_type button) const = 0;
+		virtual ~IButtonState() = default;
+	};
+
+	template <typename button_type, size_t NUM_BUTTONS = MaxValue<button_type>>
+	class ButtonsState  : public IButtonState<button_type> 
+	{
+	public:
+		using ExtensionType = std::shared_ptr<IButtonStateExtension<button_type>>;
+		using VecExtensionsType = std::vector<ExtensionType>;
+		using underlying_button_type = button_type;
+	
 
 	public:
 
 		ButtonsState()
 		{
-			fButtonStates.fill(State::Up);
+			fButtonStates.fill(ButtonState::Up);
 		}
 
-		State GetButtonState(ButtonType  buttonId) const override
+		ButtonState GetButtonState(button_type  buttonId) const 
 		{
-			return fButtonStates[buttonId];
+			return fButtonStates[static_cast<size_t>( buttonId)];
 
 		}
 
 		// Get the state of a button whether it's down or up
-		void SetButtonState(ButtonType button, State newState) override
+		void SetButtonState(button_type button, ButtonState newState) 
 		{
 			
-			State oldState = fButtonStates[button];
+			ButtonState oldState = fButtonStates[static_cast<size_t>(button)];
 			
-			if (oldState != newState && newState != State::NotSet)
+			if (oldState != newState && newState != ButtonState::NotSet)
 			{
-				fButtonStates[button] = newState;
-				for (std::shared_ptr<IButtonable<T>>& e : fButtonExtensions)
+				fButtonStates[static_cast<size_t>(button)] = newState;
+				for (ExtensionType& e : fButtonExtensions)
 					e->SetButtonState(button, newState);
 
 			}
 		}
 
-		void AddExtension(std::shared_ptr<IButtonable<T>> extension)
+		void AddExtension(ExtensionType extension)
 		{
 			fButtonExtensions.push_back(extension);
 		}
 	private:
-		VecButtonExtensions fButtonExtensions;
-		std::array<State, NUM_BUTTONS> fButtonStates;
+		VecExtensionsType fButtonExtensions;
+		std::array<ButtonState, NUM_BUTTONS> fButtonStates;
 
 	};
 }

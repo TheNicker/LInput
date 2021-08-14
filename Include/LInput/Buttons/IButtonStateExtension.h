@@ -21,16 +21,21 @@ SOFTWARE.
 */
 
 #pragma once
-#include "MouseCode.h"
+#include <cstdint>
+#include "ButtonState.h"
 namespace LInput
 {
 
-	class MouseCodeHelper
+	template <typename T>
+	constexpr size_t MaxValue = (1 << (sizeof(T) * 8 - 1)) | (sizeof(T) * 8 - 1);
+
+
+	template <typename button_type>
+	
+	class IButtonStateExtension
 	{
 	public:
-		static const char* MouseCodeToString(MouseButton button)
-		{
-			return MouseButtonString.find(button)->second;
-		}
+		virtual void SetButtonState(button_type button, ButtonState state) = 0;
+		virtual ~IButtonStateExtension(){}
 	};
 }

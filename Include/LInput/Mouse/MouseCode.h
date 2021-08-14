@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 Lior Lahav
+Copyright (c) 2021 Lior Lahav
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,21 +21,25 @@ SOFTWARE.
 */
 
 #pragma once
-#include <string>
-
+#include <map>
 namespace LInput
 {
 
-	enum class MouseButton
+	enum class MouseButton : uint8_t
 	{
-	  	  Left
-		, Right
-		, Middle
-		, Button1
+		  Button1
 		, Button2
 		, Button3
 		, Button4
 		, Button5
+		, Button6
+		, Button7
+		, Button8
+		, Left		= Button1
+		, Right		= Button2
+		, Middle	= Button3
+		, Back		= Button4
+		, Forward	= Button5
 	};
 
 

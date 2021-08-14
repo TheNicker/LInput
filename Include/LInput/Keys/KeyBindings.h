@@ -23,7 +23,7 @@ SOFTWARE.
 #pragma once
 #include "KeyCombination.h"
 #include <unordered_map>
-#include "Exception.h"
+#include <LLUtils/Exception.h>
 
 namespace LInput
 {
@@ -36,10 +36,11 @@ namespace LInput
     public:
       void AddBinding(KeyCombination combination,const BindingType& binding)
       {
-          if (static_cast<KeyCode>(combination.keycode) == KeyCode::UNASSIGNED)
+          if (static_cast<KeyCode>(combination.keydata().keycode) == KeyCode::UNASSIGNED)
               LL_EXCEPTION(LLUtils::Exception::ErrorCode::LogicError , "trying to add an 'Unassigned' key binding");
 
-          auto ib = mBindings.insert(MapCombinationToBinding::value_type(combination, binding));
+
+          auto ib = mBindings.emplace(combination, binding);
           if (ib.second == false)
               LL_EXCEPTION(LLUtils::Exception::ErrorCode::DuplicateItem, "duplicate entries are not allowed");
       }
@@ -50,11 +51,16 @@ namespace LInput
               AddBinding(comb, binding);
       }
 
-      const BindingType& GetBinding(KeyCombination combination)
+      bool GetBinding(KeyCombination combination, BindingType& bindingType)
       {
           static BindingType empty;
-          MapCombinationToBinding::const_iterator it = mBindings.find(combination);
-          return it != mBindings.end() ? it->second : empty;
+          typename MapCombinationToBinding::const_iterator it = mBindings.find(combination);
+          if (it != mBindings.end())
+          {
+              bindingType = it->second;
+              return true;
+          }
+          return false;
       }
 
     private:
