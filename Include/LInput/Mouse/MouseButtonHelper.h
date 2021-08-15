@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021 Lior Lahav
+Copyright (c) 2020 Lior Lahav
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,39 +21,16 @@ SOFTWARE.
 */
 
 #pragma once
-#include <map>
+#include "MouseButton.h"
 namespace LInput
 {
 
-	enum class MouseButton : uint8_t
+	class MouseCodeHelper
 	{
-		  Button1
-		, Button2
-		, Button3
-		, Button4
-		, Button5
-		, Button6
-		, Button7
-		, Button8
-		, Left		= Button1
-		, Right		= Button2
-		, Middle	= Button3
-		, Back		= Button4
-		, Forward	= Button5
+	public:
+		static const char* MouseCodeToString(MouseButton button)
+		{
+			return MouseButtonString[static_cast<size_t>(button)];
+		}
 	};
-
-
-	const std::map<MouseButton, const char*> MouseButtonString
-	{
-
-		 {MouseButton::Left    ,"MouseButtonLeft"}
-		,{MouseButton::Middle  ,"MouseButtonMiddle"}
-		,{MouseButton::Right   ,"MouseButtonRight"}
-		,{MouseButton::Button1 ,"MouseButton_1" }
-		,{MouseButton::Button2 ,"MouseButton_2" }
-		,{MouseButton::Button3 ,"MouseButton_3" }
-		,{MouseButton::Button4 ,"MouseButton_4" }
-		,{MouseButton::Button5 , "MouseButton_5"}
-	};
-	
 }
