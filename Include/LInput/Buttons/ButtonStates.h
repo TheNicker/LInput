@@ -59,14 +59,14 @@ namespace LInput
 			fButtonStates.fill(ButtonState::Up);
 		}
 
-		ButtonState GetButtonState(button_type  buttonId) const 
+		ButtonState GetButtonState(button_type  buttonId) const override
 		{
 			return fButtonStates[static_cast<size_t>( buttonId)];
 
 		}
 
 		// Get the state of a button whether it's down or up
-		void SetButtonState(button_type button, ButtonState newState) 
+		void SetButtonState(button_type button, ButtonState newState) override
 		{
 			
 			ButtonState oldState = fButtonStates[static_cast<size_t>(button)];
