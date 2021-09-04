@@ -29,8 +29,8 @@ SOFTWARE.
 #include <LInput/Buttons/Extensions/MultiTapExtensions.h>
 #include <LInput/Keys/KeyCodeHelper.h>
 #include <LInput/Keys/KeyCombination.h>
-#include <LInput/Mouse/MouseCode.h>
-#include <LInput/Mouse/MouseCodeHelper.h>
+#include <LInput/Mouse/MouseButton.h>
+#include <LInput/Mouse/MouseButtonHelper.h>
 
 
 

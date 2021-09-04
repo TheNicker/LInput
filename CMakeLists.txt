@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 17)
 include_directories(./External/Win32/Win32//Include)
 include_directories(./External/LLUtils/Include)
 include_directories(./Include)
+
+option(WIN32_LIB_BUILD_SAMPLES FALSE)
 add_subdirectory(./External/Win32/)
 
 add_subdirectory("Example")
