@@ -64,6 +64,11 @@ namespace LInput
             , Keyboard
             , LEDs
             , Button
+            , ConsumerContorls = 0x000C
+            , GenericHIDDevices = 0x000D
+            , Sensors = 0x0020
+            , HIDUPS = 0x0084
+            , BarcodeScanner = 0x008C
         };
         
 

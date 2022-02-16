@@ -24,6 +24,7 @@ SOFTWARE.
 #include <vector>
 #include "KeyCode.h"
 #include "KeyCodeHelper.h"
+#include <LLUtils/Warnings.h>
 
 #pragma pack(push, 1)
 namespace LInput
@@ -131,7 +132,8 @@ namespace LInput
         }
 #endif
      
-      
+     LLUTILS_DISABLE_WARNING_PUSH 
+     LLUTILS_DISABLE_WARNING_SWITCH_ENUM
     private:
         void AssignKey(KeyCode key)
         {
@@ -167,6 +169,7 @@ namespace LInput
             break;
             }
         }
+LLUTILS_DISABLE_WARNING_POP
 
 #pragma region memeber fields
 #pragma pack(push,1)

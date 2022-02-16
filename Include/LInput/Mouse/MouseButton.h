@@ -47,8 +47,8 @@ namespace LInput
 	const std::vector<const char*> MouseButtonString
 	{
 		 "MouseButtonLeft"
-		,"MouseButtonMiddle"
 		,"MouseButtonRight"
+		,"MouseButtonMiddle"
 		,"MouseButtonBack" 
 		,"MouseButtonForward" 
 		,"MouseButton_6" 
