@@ -30,8 +30,12 @@ namespace LInput
     template <class BindingType>
     class KeyBindings
     {
+    public:
+        using ConcreteBindingType = std::vector<BindingType>;
     private:
-        using MapCombinationToBinding = std::unordered_map<KeyCombination, BindingType, KeyCombination::Hash>;
+        
+        using MapCombinationToBinding = std::unordered_map<KeyCombination, ConcreteBindingType, KeyCombination::Hash>;
+
 
     public:
       void AddBinding(KeyCombination combination,const BindingType& binding)
@@ -40,9 +44,21 @@ namespace LInput
               LL_EXCEPTION(LLUtils::Exception::ErrorCode::LogicError , "trying to add an 'Unassigned' key binding");
 
 
-          auto ib = mBindings.emplace(combination, binding);
-          if (ib.second == false)
-              LL_EXCEPTION(LLUtils::Exception::ErrorCode::DuplicateItem, "duplicate entries are not allowed");
+          auto it = mBindings.find(combination);
+          
+          if (it == mBindings.end())
+          {
+              auto ib = mBindings.emplace(combination, ConcreteBindingType{ binding });
+              if (ib.second == false)
+                  LL_EXCEPTION(LLUtils::Exception::ErrorCode::DuplicateItem, "duplicate entries are not allowed");
+          }
+          else
+          {
+              ConcreteBindingType& bindings = it->second;
+              bindings.push_back(binding);
+          }
+
+          
       }
 
       void AddBinding(ListKeyCombinations combination, const BindingType& binding)
@@ -51,7 +67,7 @@ namespace LInput
               AddBinding(comb, binding);
       }
 
-      bool GetBinding(KeyCombination combination, BindingType& bindingType)
+      bool GetBinding(KeyCombination combination, ConcreteBindingType& bindingType)
       {
           static BindingType empty;
           typename MapCombinationToBinding::const_iterator it = mBindings.find(combination);
