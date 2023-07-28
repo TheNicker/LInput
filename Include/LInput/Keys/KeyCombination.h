@@ -117,17 +117,22 @@ namespace LInput
 #ifdef _WIN32
         static KeyCombination FromVirtualKey(uint32_t key, uint32_t params)
         {
-	        KeyCombination combination;
-	        auto& flags = combination.keydata();
-	        flags.leftAlt = (GetKeyState(VK_LMENU) & static_cast<USHORT>(0x8000)) != 0;
-	        flags.rightAlt = (GetKeyState(VK_RMENU) & static_cast<USHORT>(0x8000)) != 0;
-	        flags.leftCtrl = (GetKeyState(VK_LCONTROL) & static_cast<USHORT>(0x8000)) != 0;
-	        flags.rightCtrl = (GetKeyState(VK_RCONTROL) & static_cast<USHORT>(0x8000)) != 0;
-	        flags.leftShift = (GetKeyState(VK_LSHIFT) & static_cast<USHORT>(0x8000)) != 0;
-	        flags.rightShift = (GetKeyState(VK_RSHIFT) & static_cast<USHORT>(0x8000)) != 0;
-	        flags.leftWinKey = (GetKeyState(VK_LWIN) & static_cast<USHORT>(0x8000)) != 0;
-	        flags.rightWinKey = (GetKeyState(VK_RWIN) & static_cast<USHORT>(0x8000)) != 0;
-	        flags.keycode = KeyCodeHelper::KeyCodeFromVK(key, params);
+            KeyCombination combination{};
+            auto& flags = combination.keydata();
+
+            BYTE keystate[256];
+            if (GetKeyboardState(keystate) != FALSE)
+            {
+                flags.leftAlt =     (keystate[VK_LMENU]     & static_cast<USHORT>(0x80)) != 0;
+                flags.rightAlt =    (keystate[VK_RMENU]     & static_cast<USHORT>(0x80)) != 0;
+                flags.leftCtrl =    (keystate[VK_LCONTROL]  & static_cast<USHORT>(0x80)) != 0;
+                flags.rightCtrl =   (keystate[VK_RCONTROL]  & static_cast<USHORT>(0x80)) != 0;
+                flags.leftShift =   (keystate[VK_LSHIFT]    & static_cast<USHORT>(0x80)) != 0;
+                flags.rightShift =  (keystate[VK_RSHIFT]    & static_cast<USHORT>(0x80)) != 0;
+                flags.leftWinKey =  (keystate[VK_LWIN]      & static_cast<USHORT>(0x80)) != 0;
+                flags.rightWinKey = (keystate[VK_RWIN]      & static_cast<USHORT>(0x80)) != 0;
+                flags.keycode = KeyCodeHelper::KeyCodeFromVK(key, params);
+            }
 	        return combination;
         }
 #endif
