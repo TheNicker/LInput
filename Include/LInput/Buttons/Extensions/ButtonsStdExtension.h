@@ -46,7 +46,7 @@ namespace LInput
 	
 	public:
 		
-		ButtonStdExtension(uint16_t id, uint16_t multipressRate, uint16_t repeatRate) :
+		ButtonStdExtension(uint8_t id, uint16_t multipressRate, uint16_t repeatRate) :
 		  fID(id)
 		, fMultiPressRate(multipressRate)
 		, fRepeatRate(repeatRate)
@@ -142,7 +142,7 @@ namespace LInput
 
 	
 	
-		uint16_t GetID() const { return fID; }
+		uint8_t GetID() const { return fID; }
 		// Get the state of a button whether it's down or up
 		 void SetButtonState(button_type button, ButtonState newState) override
 		{
@@ -201,7 +201,7 @@ namespace LInput
 		}
 	private:
 		
-		uint16_t fID = 0;
+		uint8_t fID = 0;
 		/// <summary>
 		/// time in millisecond between actuation that determines the time threshold between presses
 		/// </summary>
