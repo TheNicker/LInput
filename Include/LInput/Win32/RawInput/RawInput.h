@@ -269,7 +269,7 @@ namespace LInput
             // Get the preparsed data block
             //
 
-            UINT                 bufferSize;
+            UINT bufferSize{};
             if (GetRawInputDeviceInfo(header.hDevice,
                 RIDI_PREPARSEDDATA, nullptr, &bufferSize) != 0)
                 LL_EXCEPTION(LLUtils::Exception::ErrorCode::InvalidState, "could not get input device info");
@@ -431,7 +431,7 @@ namespace LInput
 
             case  WM_INPUT:
             {
-                UINT dwSize;
+                UINT dwSize{};
                 if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lparam), RID_INPUT, nullptr, &dwSize, sizeof(RAWINPUTHEADER)) != 0)
                     LL_EXCEPTION_SYSTEM_ERROR("can not get raw input data");
 
