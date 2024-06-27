@@ -35,9 +35,21 @@ SOFTWARE.
 
 #include <type_traits>
 
+
+//Workaround for mingw
+#ifdef __MINGW32__
+extern "C"
+{
+#endif
+
 #include <hidclass.h>
 #include <hidusage.h>
 #include <hidpi.h>
+
+#ifdef __MINGW32__
+}
+#endif
+
 
 
 
