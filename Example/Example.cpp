@@ -22,6 +22,8 @@ SOFTWARE.
 
 #include <iostream>
 #include <array>
+#include <cstdint>
+#include <vector>
 #include <Windows.h>
 #include <LInput/Win32/RawInput/RawInput.h>
 #include <LInput/Buttons/ButtonStates.h>
@@ -31,6 +33,101 @@ SOFTWARE.
 #include <LInput/Keys/KeyCombination.h>
 #include <LInput/Mouse/MouseButton.h>
 #include <LInput/Mouse/MouseButtonHelper.h>
+
+
+namespace
+{
+	constexpr UINT RawInputDeviceInfoFailure = static_cast<UINT>(-1);
+
+	const char* RawInputDeviceTypeToString(DWORD type)
+	{
+		switch (type)
+		{
+		case RIM_TYPEMOUSE:
+			return "mouse";
+		case RIM_TYPEKEYBOARD:
+			return "keyboard";
+		case RIM_TYPEHID:
+			return "hid";
+		default:
+			return "unknown";
+		}
+	}
+
+	std::ostream& NativeOutput()
+	{
+		return std::cout;
+	}
+
+	void PrintRawInputDeviceName(HANDLE deviceHandle)
+	{
+		UINT size = 0;
+		SetLastError(ERROR_SUCCESS);
+		const UINT sizeResult = GetRawInputDeviceInfo(deviceHandle, RIDI_DEVICENAME, nullptr, &size);
+		const DWORD sizeLastError = GetLastError();
+
+		NativeOutput() << " sizeResult=" << sizeResult << " size=" << size << " sizeLastError=" << sizeLastError;
+
+		if (sizeResult == RawInputDeviceInfoFailure && sizeLastError != ERROR_SUCCESS)
+			return;
+
+		if (size == 0)
+		{
+			NativeOutput() << " name=<empty>";
+			return;
+		}
+
+		std::vector<TCHAR> deviceName(size + 1, TEXT('\0'));
+		UINT nameSize = static_cast<UINT>(deviceName.size());
+		SetLastError(ERROR_SUCCESS);
+		const UINT nameResult = GetRawInputDeviceInfo(deviceHandle, RIDI_DEVICENAME, deviceName.data(), &nameSize);
+		const DWORD nameLastError = GetLastError();
+
+		NativeOutput() << " nameResult=" << nameResult << " nameSize=" << nameSize
+			<< " nameLastError=" << nameLastError;
+
+		if (nameResult == RawInputDeviceInfoFailure)
+		{
+			NativeOutput() << " name=<failed>";
+			return;
+		}
+
+#ifdef UNICODE
+		std::wcout << L" name=" << deviceName.data();
+#else
+		std::cout << " name=" << deviceName.data();
+#endif
+	}
+
+	void PrintRawInputDeviceNames()
+	{
+		UINT deviceCount = 0;
+		if (GetRawInputDeviceList(nullptr, &deviceCount, sizeof(RAWINPUTDEVICELIST)) != 0)
+		{
+			std::cout << "GetRawInputDeviceList count query failed, lastError=" << GetLastError() << std::endl;
+			return;
+		}
+
+		std::vector<RAWINPUTDEVICELIST> devices(deviceCount);
+		const UINT deviceListResult =
+			GetRawInputDeviceList(devices.data(), &deviceCount, sizeof(RAWINPUTDEVICELIST));
+
+		if (deviceListResult == RawInputDeviceInfoFailure)
+		{
+			std::cout << "GetRawInputDeviceList failed, lastError=" << GetLastError() << std::endl;
+			return;
+		}
+
+		std::cout << "Raw input devices: " << deviceListResult << std::endl;
+		for (UINT i = 0; i < deviceListResult; ++i)
+		{
+			std::cout << "[" << i << "] handle=" << reinterpret_cast<std::uintptr_t>(devices[i].hDevice)
+				<< " type=" << RawInputDeviceTypeToString(devices[i].dwType) << "(" << devices[i].dwType << ")";
+			PrintRawInputDeviceName(devices[i].hDevice);
+			std::cout << std::endl;
+		}
+	}
+}
 
 
 namespace LInput
@@ -249,6 +346,8 @@ int main()
 	rawInput.AddDevice(RawInput::UsagePage::GenericDesktopControls, RawInput::GenericDesktopControlsUsagePage::Mouse, RawInput::Flags::EnableBackground);
 	rawInput.AddDevice(RawInput::UsagePage::GenericDesktopControls, RawInput::GenericDesktopControlsUsagePage::Keyboard, RawInput::Flags::EnableBackground);
 	//rawInput.AddDevice(RawInput::UsagePage::GenericDesktopControls, RawInput::GenericDesktopControlsUsagePage::Joystick, RawInput::Flags::EnableBackground);
+
+	PrintRawInputDeviceNames();
 
 	//Add input callback 
 

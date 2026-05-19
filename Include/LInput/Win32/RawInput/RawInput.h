@@ -21,9 +21,12 @@ SOFTWARE.
 */
 
 #pragma once
+#include <algorithm>
 #include <array>
 #include <climits>
 #include <map>
+#include <memory>
+#include <vector>
 
 #include <Windows.h>
 #include <LLUtils/Exception.h>
@@ -205,7 +208,8 @@ namespace LInput
             wc.lpfnWndProc = WndProc;
             wc.hInstance = GetModuleHandle(nullptr);
             wc.lpszClassName = CLASS_NAME;
-            RegisterClass(&wc);
+            if (RegisterClass(&wc) == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
+                LL_EXCEPTION_SYSTEM_ERROR("could not register raw input window class");
 
 
             // Create the window.
@@ -226,6 +230,9 @@ namespace LInput
                     this        // Additional application data
                 );
 
+            if (fWindowHandle == nullptr)
+                LL_EXCEPTION_SYSTEM_ERROR("could not create raw input window");
+
         	if (SetProp(fWindowHandle, sCurrentInstanceName, reinterpret_cast<HANDLE>(this)) == 0)
                 LL_EXCEPTION_SYSTEM_ERROR("could not set window property"); 
         }
@@ -240,7 +247,7 @@ namespace LInput
             RawInputEventKeyBoard keyEvent{};
             auto [button, state] = KeyCodeHelper::KeyEventFromRawInput(rawKeyboard);
             keyEvent.state = state;
-			keyEvent.deviceIndex = GetDeviceID(static_cast<HRAWINPUT> (header.hDevice));
+			keyEvent.deviceIndex = GetDeviceID(static_cast<HRAWINPUT> (header.hDevice), header.dwType);
             keyEvent.deviceType = RawInputDeviceType::Keyboard;
             keyEvent.scanCode = button;
             OnInput.Raise(keyEvent);
@@ -268,7 +275,7 @@ namespace LInput
 
             RawInputEventHID evnt{ };
             evnt.deviceType = RawInputDeviceType::GamePad;
-            evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice));
+            evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice), header.dwType);
             std::fill(std::begin(evnt.buttonState), std::end(evnt.buttonState), ButtonState::Up);
 
             USHORT               capsLength;
@@ -384,7 +391,7 @@ namespace LInput
             RawInputEventMouse evnt{};
             evnt.deltaX = mouse.lLastX;
             evnt.deltaY = mouse.lLastY;
-			evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice));
+			evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice), header.dwType);
             evnt.deviceType = RawInputDeviceType::Mouse;
             if (mouse.usButtonFlags == RI_MOUSE_WHEEL)
             {
@@ -407,10 +414,126 @@ namespace LInput
             OnInput.Raise(evnt);
         }
 
-		uint8_t GetDeviceID(HRAWINPUT handle)
+    private:
+
+        static RawInputDeviceType ToRawInputDeviceType(DWORD rawType)
+        {
+            switch (rawType)
+            {
+            case RIM_TYPEMOUSE:
+                return RawInputDeviceType::Mouse;
+            case RIM_TYPEKEYBOARD:
+                return RawInputDeviceType::Keyboard;
+            case RIM_TYPEHID:
+                return RawInputDeviceType::GamePad;
+            default:
+                LL_EXCEPTION_UNEXPECTED_VALUE;
+            }
+        }
+
+        static RID_DEVICE_INFO QueryRawInputDeviceInfo(HRAWINPUT handle)
+        {
+            RID_DEVICE_INFO info{};
+            info.cbSize = sizeof(info);
+
+            UINT size = sizeof(info);
+            if (::GetRawInputDeviceInfo(handle, RIDI_DEVICEINFO, &info, &size) == static_cast<UINT>(-1))
+                LL_EXCEPTION_SYSTEM_ERROR("could not get raw input device info");
+
+            return info;
+        }
+
+        static LLUtils::native_string_type TryQueryRawInputDeviceName(HRAWINPUT handle)
+        {
+            UINT size = 0;
+            SetLastError(ERROR_SUCCESS);
+            if (::GetRawInputDeviceInfo(handle, RIDI_DEVICENAME, nullptr, &size) == static_cast<UINT>(-1))
+            {
+                if (GetLastError() != ERROR_SUCCESS)
+                    LL_EXCEPTION_SYSTEM_ERROR("could not get raw input device name size");
+
+                return {};
+            }
+
+            // Some environments, especially RDP, report valid handles without a usable interface name.
+            if (size <= 1)
+                return {};
+
+            std::vector<LLUtils::native_char_type> buffer(size + 1);
+
+            SetLastError(ERROR_SUCCESS);
+            if (::GetRawInputDeviceInfo(handle, RIDI_DEVICENAME, buffer.data(), &size) == static_cast<UINT>(-1))
+            {
+                if (GetLastError() != ERROR_SUCCESS)
+                    LL_EXCEPTION_SYSTEM_ERROR("could not get raw input device name");
+
+                return {};
+            }
+
+            return LLUtils::native_string_type(buffer.data());
+        }
+
+        uint8_t GetOrCreateDeviceID(const LLUtils::native_string_type& deviceName, RawInputDeviceType deviceType)
+        {
+            // Public IDs are stable across unplug/replug when Windows gives us a stable interface name.
+            if (deviceName.empty() == false)
+            {
+                auto it = fDeviceNameToInfo.find(deviceName);
+                if (it == std::end(fDeviceNameToInfo))
+                {
+                    const uint8_t id = fIds.Acquire();
+                    it = fDeviceNameToInfo.emplace_hint(it, deviceName, DeviceInfo{ id , deviceType });
+                }
+
+                return it->second.deviceID;
+            }
+
+            // Without a name there is no documented per-device key, so the stable fallback is per type.
+            auto it = fUnnamedDeviceTypeToInfo.find(deviceType);
+            if (it == std::end(fUnnamedDeviceTypeToInfo))
+            {
+                const uint8_t id = fIds.Acquire();
+                it = fUnnamedDeviceTypeToInfo.emplace_hint(it, deviceType, DeviceInfo{ id , deviceType });
+            }
+
+            return it->second.deviceID;
+        }
+
+        void RemoveOldNamedDeviceHandles(uint8_t id, HRAWINPUT currentHandle)
+        {
+            for (auto it = fDevicehHandleToID.begin(); it != fDevicehHandleToID.end();)
+            {
+                if (it->first != currentHandle && it->second == id)
+                    it = fDevicehHandleToID.erase(it);
+                else
+                    ++it;
+            }
+        }
+
+        uint8_t RegisterRawInputDeviceHandle(HRAWINPUT handle, RawInputDeviceType deviceType)
+        {
+            const LLUtils::native_string_type deviceName = TryQueryRawInputDeviceName(handle);
+            const uint8_t id = GetOrCreateDeviceID(deviceName, deviceType);
+
+            // Named devices have one current handle per stable identity; unnamed fallback devices may have many.
+            if (deviceName.empty() == false)
+                RemoveOldNamedDeviceHandles(id, handle);
+
+            fDevicehHandleToID[handle] = id;
+            return id;
+        }
+
+		uint8_t GetDeviceID(HRAWINPUT handle, DWORD rawType)
 		{
-			return fDevicehHandleToID.find(handle)->second;
+            auto it = fDevicehHandleToID.find(handle);
+            if (it != std::end(fDevicehHandleToID))
+                return it->second;
+
+            // Input can arrive before or without a device-change notification; register lazily for routing.
+            return RegisterRawInputDeviceHandle(handle, ToRawInputDeviceType(rawType));
 		}
+
+    public:
 
         void ProcessRawInputMessage(RAWINPUT* rawInput)
         {
@@ -469,48 +592,13 @@ namespace LInput
                 const HRAWINPUT rawInputHandle = reinterpret_cast<HRAWINPUT>(lparam);
                 if (wparam == GIDC_ARRIVAL)
                 {
-
-                    UINT size = 0;
-                    GetRawInputDeviceInfo(reinterpret_cast<HRAWINPUT>(lparam), RIDI_DEVICENAME, nullptr, &size);
-                    auto buffer = std::make_unique<wchar_t[]>(size);
-                    GetRawInputDeviceInfo(reinterpret_cast<HRAWINPUT>(lparam), RIDI_DEVICENAME, buffer.get(), &size);
-                    std::wstring deviceName(buffer.get());
-
-                    RID_DEVICE_INFO info;
-                    info.cbSize = sizeof(info);
-                    size = sizeof(info);
-                    GetRawInputDeviceInfo(reinterpret_cast<HRAWINPUT>(lparam), RIDI_DEVICEINFO, &info, &size);
-
-                    auto it = fDeviceNameToInfo.find(deviceName);
-                    uint8_t id = 0;
-                    if (it == std::end(fDeviceNameToInfo))
-                    {
-                        id = fIds.Acquire();
-                        fDeviceNameToInfo.emplace_hint(it, deviceName, DeviceInfo{ id , static_cast<RawInputDeviceType>(info.dwType)});
-                    }
-                    else
-                    {
-                        id = it->second.deviceID;
-                    }
-
-
-                    //Remove old handle if exists.
-
-                    for (const auto& p : fDevicehHandleToID)
-                    {
-                        if (p.second == id)
-                        {
-                            fDevicehHandleToID.erase(p.first);
-                            break;
-                        }
-                    }
-
-                    //Add new handle
-                    fDevicehHandleToID.emplace(rawInputHandle, id);
+                    const RID_DEVICE_INFO info = QueryRawInputDeviceInfo(rawInputHandle);
+                    RegisterRawInputDeviceHandle(rawInputHandle, ToRawInputDeviceType(info.dwType));
                 }
-                else // (wparam == GIDC_REMOVAL)
+                else if (wparam == GIDC_REMOVAL)
                 {
-
+                    // Handles are transient. Keep stable identities so replugged devices reuse their IDs.
+                    fDevicehHandleToID.erase(rawInputHandle);
                 }
             }
 
@@ -525,6 +613,9 @@ namespace LInput
         static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
         {
             RawInput* _this = reinterpret_cast<RawInput*>(GetProp(hwnd, sCurrentInstanceName));
+            if (_this == nullptr)
+                return DefWindowProc(hwnd, msg, wparam, lparam);
+
             return _this->ProcessWInMessages(hwnd, msg, wparam, lparam);
         }
 
@@ -546,10 +637,15 @@ namespace LInput
         static constexpr LLUtils::native_char_type sCurrentInstanceName[] = LLUTILS_TEXT("__LINPUT_CURRENT_INSTANCE__");
 
     	using MapDeviceHandleToID = std::map<HRAWINPUT, uint8_t> ;
-		using MapDeviceNameToInfo = std::map<std::wstring, DeviceInfo>;
+		using MapDeviceNameToInfo = std::map<LLUtils::native_string_type, DeviceInfo>;
+        using MapUnnamedDeviceTypeToInfo = std::map<RawInputDeviceType, DeviceInfo>;
 		
+        // Transient raw-input handles route current messages; they are not stable device identities.
         MapDeviceHandleToID fDevicehHandleToID;
+        // Named devices keep public IDs across unplug/replug by their documented device interface name.
         MapDeviceNameToInfo fDeviceNameToInfo;
+        // Unnamed devices, such as some RDP mouse/keyboard handles, keep one stable fallback ID per type.
+        MapUnnamedDeviceTypeToInfo fUnnamedDeviceTypeToInfo;
 		LLUtils::UniqueIdProvider<uint8_t> fIds;
         bool fEnabled = false;
         HWND fWindowHandle = nullptr;
