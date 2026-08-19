@@ -30,7 +30,7 @@ SOFTWARE.
 #include <LLUtils/Event.h>
 #include <LInput/Buttons/ButtonState.h>
 #include <LInput/Buttons/IButtonStateExtension.h>
-#include <Win32/HighPrecisionTimer.h>
+#include <LWS/Timer.hpp>
 
 
 namespace LInput
@@ -47,7 +47,7 @@ namespace LInput
 			, fMaxTaps(maxTaps)
 		{
 			fTimer.SetDueTime(multipressRate);
-			fTimer.SetRepeatInterval(INFINITE);
+			fTimer.SetRepeatInterval((std::numeric_limits<uint32_t>::max)());
 		}
 
 		struct MultiTapEvent
@@ -112,7 +112,7 @@ namespace LInput
 
 			if (minTimeToEvent != (std::numeric_limits<int64_t>::min)())
 			{
-				fTimer.SetDueTime(static_cast<DWORD>( -minTimeToEvent));
+				fTimer.SetDueTime(static_cast<uint32_t>(-minTimeToEvent));
 				fTimer.Enable(true);
 			}
 
@@ -184,7 +184,7 @@ namespace LInput
 		/// </summary>
 		uint16_t fMaxTaps = 3;
 	
-		::Win32::HighPrecisionTimer fTimer = ::Win32::HighPrecisionTimer(std::bind(&MultitapExtension::TimerCallback, this));
+		LWS::HighPrecisionTimer fTimer = LWS::HighPrecisionTimer(std::bind(&MultitapExtension::TimerCallback, this));
 
 		using MapButtonToData = std::map<button_type, ButtonData>;
 		MapButtonToData fMapButttons;

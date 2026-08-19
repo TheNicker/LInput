@@ -11,7 +11,7 @@ include_directories(./LLUtils/Include)
 add_executable (LInputExample "Example.cpp")
 
 target_link_libraries(LInputExample 
-Win32
+LWSLib
 hid )
 
 if(MSVC)

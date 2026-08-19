@@ -21,12 +21,21 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
   endif()
 endif()
 
-include_directories(./External/Win32/Win32//Include)
 include_directories(./External/LLUtils/Include)
 include_directories(./Include)
 
-option(WIN32_LIB_BUILD_SAMPLES FALSE)
-add_subdirectory(./External/Win32/)
+set(LINPUT_LWS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../LWS" CACHE PATH "Path to LWS")
+if(NOT TARGET LWSLib)
+    if(EXISTS "${LINPUT_LWS_DIR}/CMakeLists.txt")
+        set(LWS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(LWS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        add_subdirectory("${LINPUT_LWS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/External/LWS")
+    else()
+        message(FATAL_ERROR "LInput requires LWSLib or a valid LINPUT_LWS_DIR")
+    endif()
+endif()
+
+include_directories("${LINPUT_LWS_DIR}/src/LWS/include")
 
 option(LINPUT_BUILD_SAMPLES "build LInput samples" ON)
 
