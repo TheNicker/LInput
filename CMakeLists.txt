@@ -1,9 +1,16 @@
 ﻿# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required(VERSION 3.20)
+project(LInput LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(MSVC OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
+    add_compile_options(/EHsc)
+    add_definitions(-DNOMINMAX -D_CRT_SECURE_NO_WARNINGS)
+endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     #enabled warnings flags
@@ -24,22 +31,8 @@ endif()
 include_directories(./External/LLUtils/Include)
 include_directories(./Include)
 
-set(LINPUT_LWS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../LWS" CACHE PATH "Path to LWS")
-if(NOT TARGET LWSLib)
-    if(EXISTS "${LINPUT_LWS_DIR}/CMakeLists.txt")
-        set(LWS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-        set(LWS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-        add_subdirectory("${LINPUT_LWS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/External/LWS")
-    else()
-        message(FATAL_ERROR "LInput requires LWSLib or a valid LINPUT_LWS_DIR")
-    endif()
-endif()
-
-include_directories("${LINPUT_LWS_DIR}/src/LWS/include")
-
 option(LINPUT_BUILD_SAMPLES "build LInput samples" ON)
 
 if (LINPUT_BUILD_SAMPLES)
     add_subdirectory("Example")
 endif()
-

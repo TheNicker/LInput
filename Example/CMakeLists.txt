@@ -1,17 +1,18 @@
 ﻿# CMakeList.txt : CMake project for GFXRendererD3D11, include source and define
 # project specific logic here.
 #
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required(VERSION 3.20)
 
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories(./LLUtils/Include)
 
 # Add source to this project's executable.
 add_executable (LInputExample "Example.cpp")
 
 target_link_libraries(LInputExample 
-LWSLib
+user32
 hid )
 
 if(MSVC)

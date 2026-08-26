@@ -30,7 +30,7 @@ SOFTWARE.
 #include <LLUtils/Event.h>
 #include <LInput/Buttons/ButtonState.h>
 #include <LInput/Buttons/IButtonStateExtension.h>
-#include <LWS/Timer.hpp>
+#include <LInput/Internal/HighPrecisionTimer.h>
 
 
 namespace LInput
@@ -184,7 +184,7 @@ namespace LInput
 		/// </summary>
 		uint16_t fMaxTaps = 3;
 	
-		LWS::HighPrecisionTimer fTimer = LWS::HighPrecisionTimer(std::bind(&MultitapExtension::TimerCallback, this));
+		Internal::HighPrecisionTimer fTimer{std::bind(&MultitapExtension::TimerCallback, this)};
 
 		using MapButtonToData = std::map<button_type, ButtonData>;
 		MapButtonToData fMapButttons;

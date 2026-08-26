@@ -31,7 +31,7 @@ SOFTWARE.
 #include <LLUtils/Event.h>
 #include <LInput/Buttons/ButtonState.h>
 #include <LInput/Buttons/IButtonStateExtension.h>
-#include <LWS/Timer.hpp>
+#include <LInput/Internal/HighPrecisionTimer.h>
 
 
 namespace LInput
@@ -210,7 +210,7 @@ namespace LInput
 		/// the repeat rate in milliseconds, set to zero (0) to disable repeat rate
 		/// </summary>
 		uint16_t fRepeatRate = 15;
-		LWS::HighPrecisionTimer timer = LWS::HighPrecisionTimer(std::bind(&ButtonStdExtension::TimerCallback, this));
+		Internal::HighPrecisionTimer timer{std::bind(&ButtonStdExtension::TimerCallback, this)};
 		LLUtils::StopWatch fTimer = LLUtils::StopWatch(true);
 		using MapButtonToData = std::map<button_type, ButtonData>;
 		MapButtonToData mMapButttons;
