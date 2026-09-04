@@ -159,6 +159,7 @@ namespace LInput
         {
             int deltaX;
             int deltaY;
+            // Signed native wheel motion in WHEEL_DELTA units per logical detent.
             int16_t wheelDelta;
             std::array<ButtonState, MaxMouseButtons> buttonState;
         };
@@ -385,32 +386,36 @@ namespace LInput
             OnInput.Raise(evnt);
         }
 
+        [[nodiscard]] static RawInputEventMouse TranslateRawInputMouse(const RAWMOUSE& mouse, uint8_t deviceIndex)
+        {
+            RawInputEventMouse evnt{};
+            evnt.deltaX      = mouse.lLastX;
+            evnt.deltaY      = mouse.lLastY;
+            evnt.deviceIndex = deviceIndex;
+            evnt.deviceType  = RawInputDeviceType::Mouse;
+            if ((mouse.usButtonFlags & RI_MOUSE_WHEEL) != 0)
+            {
+                evnt.wheelDelta = static_cast<int16_t>(mouse.usButtonData);
+            }
+
+            for (size_t i = 0; i < MaxMouseButtons; i++)
+            {
+                ButtonState& state = evnt.buttonState[i];
+
+                if (mouse.usButtonFlags & (1ul << (i * 2)))
+                    state = ButtonState::Down;
+
+                if (mouse.usButtonFlags & (2ul << (i * 2)))
+                    state = ButtonState::Up;
+            }
+
+            return evnt;
+        }
 
         void HandleRawInputMouse(RAWINPUTHEADER& header, RAWMOUSE& mouse)
         {
-            RawInputEventMouse evnt{};
-            evnt.deltaX = mouse.lLastX;
-            evnt.deltaY = mouse.lLastY;
-			evnt.deviceIndex = GetDeviceID(static_cast<HRAWINPUT>(header.hDevice), header.dwType);
-            evnt.deviceType = RawInputDeviceType::Mouse;
-            if (mouse.usButtonFlags == RI_MOUSE_WHEEL)
-            {
-                evnt.wheelDelta = static_cast<int16_t>(mouse.usButtonData) / WHEEL_DELTA;
-            }
-            else
-            {
-                for (size_t i = 0; i < MaxMouseButtons; i++)
-                {
-                    ButtonState& state = evnt.buttonState[i];
-
-                    if (mouse.usButtonFlags & (1ul << (i * 2)))
-                        state = ButtonState::Down;
-
-                    if (mouse.usButtonFlags & (2ul << (i * 2)))
-                        state = ButtonState::Up;
-                }
-            }
-
+            const RawInputEventMouse evnt = TranslateRawInputMouse(
+                mouse, GetDeviceID(static_cast<HRAWINPUT>(header.hDevice), header.dwType));
             OnInput.Raise(evnt);
         }
 

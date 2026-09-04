@@ -299,7 +299,7 @@ namespace LInput
 
 				if (mouseEvent.wheelDelta != 0)
 				{
-					std::cout << std::endl << " Wheel delta " << mouseEvent.wheelDelta;
+					std::cout << std::endl << " Wheel delta (120 units per step) " << mouseEvent.wheelDelta;
 				}
 
 
