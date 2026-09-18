@@ -255,14 +255,14 @@ namespace LInput
 
 					auto stdExtension = std::make_shared< ButtonStdExtension<KeyboardButtonType>>(evnt.deviceIndex, multiPressRate, repeatRate);
 					it->second.AddExtension(std::static_pointer_cast <KeyboardButtonstate::ExtensionType::element_type>(stdExtension));
-                    keyboardConnections.push_back(stdExtension->OnButtonEvent.Connect(
+                    keyboardSubscriptions.push_back(stdExtension->OnButtonEvent.Subscribe(
                         std::bind(&Example::OnKeyBoardEvent, this, std::placeholders::_1)));
 
                     //Add multitap extension for click, double click and triple click
 
 					auto multitapextension = std::make_shared<MultitapExtension<KeyboardButtonType>>(evnt.deviceIndex, 200, 4);
 					it->second.AddExtension(std::static_pointer_cast<IButtonStateExtension<KeyboardButtonType>>(multitapextension));
-                    keyboardTapConnections.push_back(multitapextension->OnButtonEvent.Connect(
+                    keyboardTapSubscriptions.push_back(multitapextension->OnButtonEvent.Subscribe(
                         std::bind(&Example::OnKeyBoardMultiTap, this, std::placeholders::_1)));
                 }
 
@@ -285,14 +285,14 @@ namespace LInput
 					//Add standard extension
 					auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex, multiPressRate, repeatRate);
 					it->second.AddExtension(std::static_pointer_cast<IButtonStateExtension<uint8_t>>(stdExtension));
-                    buttonConnections.push_back(stdExtension->OnButtonEvent.Connect(
+                    buttonSubscriptions.push_back(stdExtension->OnButtonEvent.Subscribe(
                         std::bind(&Example::OnMouseEvent, this, std::placeholders::_1)));
 
                     //Add multitap extension for click, double click and triple click
 
 					auto multitapextension = std::make_shared<MultitapExtension<uint8_t>>(evnt.deviceIndex, 200, 4);
 					it->second.AddExtension(std::static_pointer_cast<IButtonStateExtension<uint8_t>>(multitapextension));
-                    buttonTapConnections.push_back(multitapextension->OnButtonEvent.Connect(
+                    buttonTapSubscriptions.push_back(multitapextension->OnButtonEvent.Subscribe(
                         std::bind(&Example::OnMouseMultiTap, this, std::placeholders::_1)));
                 }
 
@@ -321,7 +321,7 @@ namespace LInput
 
 					auto stdExtension = std::make_shared<ButtonStdExtension<uint8_t>>(evnt.deviceIndex, multiPressRate, repeatRate);
 					it->second.AddExtension(std::static_pointer_cast<IButtonStateExtension<uint8_t>>(stdExtension));
-                    buttonConnections.push_back(stdExtension->OnButtonEvent.Connect(
+                    buttonSubscriptions.push_back(stdExtension->OnButtonEvent.Subscribe(
                         std::bind(&Example::OnHIDEvent, this, std::placeholders::_1)));
                 }
 
@@ -338,12 +338,13 @@ namespace LInput
 			uint16_t multiPressRate = 250;
 			uint16_t repeatRate = 10;
 			int c = 0;
-            // Disconnect before the device groups release their extension publishers.
-            std::vector<decltype(ButtonStdExtension<KeyboardButtonType>::OnButtonEvent)::Connection> keyboardConnections;
-            std::vector<decltype(MultitapExtension<KeyboardButtonType>::OnButtonEvent)::Connection>
-                keyboardTapConnections;
-            std::vector<decltype(ButtonStdExtension<uint8_t>::OnButtonEvent)::Connection> buttonConnections;
-            std::vector<decltype(MultitapExtension<uint8_t>::OnButtonEvent)::Connection> buttonTapConnections;
+            // Unsubscribe before the device groups release their extension publishers.
+            std::vector<decltype(ButtonStdExtension<KeyboardButtonType>::OnButtonEvent)::Subscription>
+                keyboardSubscriptions;
+            std::vector<decltype(MultitapExtension<KeyboardButtonType>::OnButtonEvent)::Subscription>
+                keyboardTapSubscriptions;
+            std::vector<decltype(ButtonStdExtension<uint8_t>::OnButtonEvent)::Subscription> buttonSubscriptions;
+            std::vector<decltype(MultitapExtension<uint8_t>::OnButtonEvent)::Subscription> buttonTapSubscriptions;
     };
 }
 
@@ -361,7 +362,8 @@ int main()
 
 	//Add input callback
 
-    auto inputConnection = rawInput.OnInput.Connect(std::bind(&Example::OnRawInput, &example, std::placeholders::_1));
+    auto inputSubscription = rawInput.OnInput.Subscribe(
+        std::bind(&Example::OnRawInput, &example, std::placeholders::_1));
     rawInput.Enable(true);
 
 	std::cout << "Press 'Q' three times to quit." << std::endl;
